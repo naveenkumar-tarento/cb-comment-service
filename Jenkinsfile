@@ -23,7 +23,11 @@ node() {
 				echo "CHANGE_BRANCH = ${env.CHANGE_BRANCH}"
 				echo "CHANGE_TARGET = ${env.CHANGE_TARGET}"
 				
+<<<<<<< HEAD
                 def commit_hash = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+=======
+                commit_hash = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+>>>>>>> 9e918c7 (Add echo statements for GitHub release and change info)
 			
 				if (params.github_release_tag) {
     				build_tag = "${params.github_release_tag.split('/')[-1]}_${commit_hash}_${env.BUILD_NUMBER}"
