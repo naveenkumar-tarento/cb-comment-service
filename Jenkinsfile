@@ -47,11 +47,15 @@ node() {
 	     }
         }
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 0cc26ea (Refactor docker-pre-build stage in Jenkinsfile)
 		if (!env.docker_pre_build?.trim()) {
     		env.docker_pre_build = "${JOB_BASE_NAME}-build"
 		}
 
 		echo "JOB_BASE_NAME = ${JOB_BASE_NAME}"
+<<<<<<< HEAD
 		echo "docker_pre_build = ${env.docker_pre_build}"
 		echo "docker_server = ${env.docker_server}"
 		echo "enable_code_analysis = ${params.enable_code_analysis}"
@@ -80,6 +84,21 @@ node() {
             '''
         }
 >>>>>>> 54f238d (Update Jenkinsfile with variable declaration and echo statements)
+=======
+		echo "docker_pre_build = ${env.docker_pre_build}"
+		echo "docker_server = ${env.docker_server}"
+		echo "enable_code_analysis = ${params.enable_code_analysis}"
+
+		stage('docker-pre-build') {
+    		sh '''
+    		docker build -f ./Dockerfile.build -t $docker_pre_build .
+    		docker run --name $docker_pre_build $docker_pre_build:latest && docker cp $docker_pre_build:/opt/target/cb-comment-service-0.0.1-SNAPSHOT.jar .
+    		sleep 2
+    		docker rm -f $docker_pre_build
+    		docker rmi -f $docker_pre_build
+    		'''
+		}
+>>>>>>> 0cc26ea (Refactor docker-pre-build stage in Jenkinsfile)
         stage('Build') {
                 env.NODE_ENV = "build"
                 print "Environment will be : ${env.NODE_ENV}"
