@@ -24,10 +24,14 @@ node() {
 				echo "CHANGE_TARGET = ${env.CHANGE_TARGET}"
 				
 <<<<<<< HEAD
+<<<<<<< HEAD
                 def commit_hash = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
 =======
                 commit_hash = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
 >>>>>>> 9e918c7 (Add echo statements for GitHub release and change info)
+=======
+                def commit_hash = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+>>>>>>> 54f238d (Update Jenkinsfile with variable declaration and echo statements)
 			
 				if (params.github_release_tag) {
     				build_tag = "${params.github_release_tag.split('/')[-1]}_${commit_hash}_${env.BUILD_NUMBER}"
@@ -42,6 +46,7 @@ node() {
                build job: "Build/CodeReview/${JOB_BASE_NAME}", wait: true
 	     }
         }
+<<<<<<< HEAD
 		if (!env.docker_pre_build?.trim()) {
     		env.docker_pre_build = "${JOB_BASE_NAME}-build"
 		}
@@ -60,6 +65,21 @@ node() {
     		docker rmi -f $docker_pre_build
     		'''
 		}
+=======
+		echo "docker_pre_build = ${env.docker_pre_build}"
+		echo "docker_server = ${env.docker_server}"
+		echo "enable_code_analysis = ${params.enable_code_analysis}"
+			
+        stage('docker-pre-build') {
+            sh '''
+	    docker build -f ./Dockerfile.build -t $docker_pre_build .
+	    docker run --name $docker_pre_build $docker_pre_build:latest && docker cp $docker_pre_build:/opt/target/cb-comment-service-0.0.1-SNAPSHOT.jar .
+	    sleep 2
+	    docker rm -f $docker_pre_build
+	    docker rmi -f $docker_pre_build
+            '''
+        }
+>>>>>>> 54f238d (Update Jenkinsfile with variable declaration and echo statements)
         stage('Build') {
                 env.NODE_ENV = "build"
                 print "Environment will be : ${env.NODE_ENV}"
