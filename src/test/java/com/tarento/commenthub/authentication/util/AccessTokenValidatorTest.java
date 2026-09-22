@@ -170,7 +170,6 @@ class AccessTokenValidatorTest {
     }
 
     private String mockToken(Map<String, Object> payload) throws Exception {
-        ObjectMapper mapper = new ObjectMapper();
         String headerJson = mapper.writeValueAsString(Collections.singletonMap("kid", "key1"));
         String bodyJson = mapper.writeValueAsString(payload);
 
@@ -196,14 +195,14 @@ class AccessTokenValidatorTest {
         String token = mockToken(payload);
 
         // Mock KeyManager -> return a valid KeyData
-        PublicKey mockPublicKey = mock(PublicKey.class);
-        KeyData keyData = new KeyData("testKeyId", mockPublicKey);
+        PublicKey localPublicKey = mock(PublicKey.class);
+        KeyData keyData = new KeyData("testKeyId", localPublicKey);
         when(keyManager.getPublicKey(anyString())).thenReturn(keyData);
 
         // Also mock CryptoUtil.verifyRSASign to succeed
         try (MockedStatic<CryptoUtil> cryptoUtilMock = mockStatic(CryptoUtil.class)) {
             cryptoUtilMock.when(() ->
-                    CryptoUtil.verifyRSASign(anyString(), any(), eq(mockPublicKey), eq(Constants.SHA_256_WITH_RSA))
+                    CryptoUtil.verifyRSASign(anyString(), any(), eq(localPublicKey), eq(Constants.SHA_256_WITH_RSA))
             ).thenReturn(true);
 
             // Act
@@ -211,17 +210,6 @@ class AccessTokenValidatorTest {
 
             // Assert
             assertEquals("abc", result);
-        }
-    }
-
-
-    private boolean invokeIsExpired(int exp) {
-        try {
-            Method method = AccessTokenValidator.class.getDeclaredMethod("isExpired", Integer.class);
-            method.setAccessible(true);
-            return (boolean) method.invoke(accessTokenValidator, exp);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
         }
     }
 
@@ -235,7 +223,7 @@ class AccessTokenValidatorTest {
     }
 
     @Test
-    void testValidateToken_invalidJsonHeader() throws Exception {
+    void testValidateToken_invalidJsonHeader() {
         // Header not JSON
         String badHeader = Base64.getUrlEncoder().withoutPadding().encodeToString("not-json".getBytes());
         String body = Base64.getUrlEncoder().withoutPadding().encodeToString("{}".getBytes());

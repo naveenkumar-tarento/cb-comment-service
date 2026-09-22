@@ -40,6 +40,7 @@ public class PropertiesCache {
             try {
                 configProp.load(in);
             } catch (IOException e) {
+                logger.error("Error loading properties from file '{}'", file, e);
             }
         }
     }

@@ -16,7 +16,6 @@ import static org.mockito.ArgumentMatchers.eq;
 
 import com.tarento.commenthub.constant.Constants;
 import org.springframework.http.HttpStatus;
-import org.springframework.test.util.ReflectionTestUtils;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -47,14 +46,12 @@ class ContentServiceImplTest {
     private RestTemplate restTemplate;
     @Mock
     private ObjectMapper mapper;
-    @Spy
-    @InjectMocks
     private ContentServiceImpl contentService;
     private static final String CONTENT_ID = "test-content-id";
 
     @BeforeEach
     void setUp() {
-        ReflectionTestUtils.setField(contentService, "restTemplate", restTemplate);
+        contentService = spy(new ContentServiceImpl(dataCacheMgr, serverConfig, restTemplate, redisCacheMgr, mapper));
         lenient().when(dataCacheMgr.getContentFromCache(anyString())).thenReturn(null);
         lenient().when(redisCacheMgr.getContentFromCache(anyString())).thenReturn(null);
     }

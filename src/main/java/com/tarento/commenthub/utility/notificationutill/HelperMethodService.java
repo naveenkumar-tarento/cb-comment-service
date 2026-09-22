@@ -16,9 +16,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.io.UncheckedIOException;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -27,21 +27,24 @@ import static com.tarento.commenthub.constant.Constants.*;
 @Service
 @Slf4j
 public class HelperMethodService {
-    @Autowired
-    private ObjectMapper objectMapper;
-    @Autowired
-    private CassandraOperation cassandraOperation;
-    @Autowired
-    private RedisCacheMngr cacheService;
-    @Autowired
-    private ContentService contentService;
-    @Autowired
-    private NotificationTriggerService notificationTriggerService;
+    private final ObjectMapper objectMapper;
+    private final CassandraOperation cassandraOperation;
+    private final RedisCacheMngr cacheService;
+    private final ContentService contentService;
+    private final NotificationTriggerService notificationTriggerService;
+
+    public HelperMethodService(ObjectMapper objectMapper, CassandraOperation cassandraOperation,
+        RedisCacheMngr cacheService, ContentService contentService,
+        NotificationTriggerService notificationTriggerService) {
+      this.objectMapper = objectMapper;
+      this.cassandraOperation = cassandraOperation;
+      this.cacheService = cacheService;
+      this.contentService = contentService;
+      this.notificationTriggerService = notificationTriggerService;
+    }
 
     public String fetchDataForKeys(String keys) {
-
-        String values = cacheService.getContentFromCache(keys);
-        return values;
+        return cacheService.getContentFromCache(keys);
     }
 
     public List<Object> fetchUserFromPrimary(List<String> userIds) {
@@ -82,16 +85,16 @@ public class HelperMethodService {
                             // Check for profile image and add to userMap if available
                             if (MapUtils.isNotEmpty(profileDetailsMap)) {
                                 if (profileDetailsMap.containsKey(Constants.PROFILE_IMG) && StringUtils.isNotBlank((String) profileDetailsMap.get(Constants.PROFILE_IMG))) {
-                                    userMap.put(Constants.PROFILE_IMG_KEY, (String) profileDetailsMap.get(Constants.PROFILE_IMG));
+                                    userMap.put(Constants.PROFILE_IMG_KEY, profileDetailsMap.get(Constants.PROFILE_IMG));
                                 }
                                 if (profileDetailsMap.containsKey(Constants.DESIGNATION_KEY) && StringUtils.isNotEmpty((String) profileDetailsMap.get(Constants.DESIGNATION_KEY))) {
 
-                                    userMap.put(Constants.DESIGNATION_KEY, (String) profileDetailsMap.get(Constants.PROFILE_IMG));
+                                    userMap.put(Constants.DESIGNATION_KEY, profileDetailsMap.get(Constants.PROFILE_IMG));
                                 }
                                 if (profileDetailsMap.containsKey(Constants.EMPLOYMENT_DETAILS) && MapUtils.isNotEmpty(
                                         (Map<?, ?>) profileDetailsMap.get(Constants.EMPLOYMENT_DETAILS)) && ((Map<?, ?>) profileDetailsMap.get(Constants.EMPLOYMENT_DETAILS)).containsKey(Constants.DEPARTMENT_KEY) && StringUtils.isNotBlank(
                                         (String) ((Map<?, ?>) profileDetailsMap.get(Constants.EMPLOYMENT_DETAILS)).get(Constants.DEPARTMENT_KEY))) {
-                                    userMap.put(Constants.DEPARTMENT, (String) ((Map<?, ?>) profileDetailsMap.get(Constants.EMPLOYMENT_DETAILS)).get(Constants.DEPARTMENT_KEY));
+                                    userMap.put(Constants.DEPARTMENT, ((Map<?, ?>) profileDetailsMap.get(Constants.EMPLOYMENT_DETAILS)).get(Constants.DEPARTMENT_KEY));
 
                                 }
                             }
@@ -114,12 +117,12 @@ public class HelperMethodService {
                 resultMap = objectMapper.readValue(redisResults, new TypeReference<Map<String, Object>>() {
                 });
             } catch (JsonProcessingException e) {
-                throw new RuntimeException(e);
+                throw new UncheckedIOException(e);
             }
             Object nameObj = resultMap.get(Constants.FIRST_NAME_KEY);
 
-            if (nameObj instanceof String && StringUtils.isNotBlank((String) nameObj)) {
-                return (String) nameObj;
+            if (nameObj instanceof String string && StringUtils.isNotBlank(string)) {
+                return string;
             }
         }
 

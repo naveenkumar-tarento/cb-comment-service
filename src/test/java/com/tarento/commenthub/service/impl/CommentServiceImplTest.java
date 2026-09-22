@@ -25,7 +25,6 @@ import com.tarento.commenthub.utility.notificationutill.HelperMethodService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -47,7 +46,6 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class CommentServiceImplTest {
 
-    @InjectMocks
     private CommentServiceImpl commentService;
 
     @Mock
@@ -116,8 +114,9 @@ class CommentServiceImplTest {
 
     @BeforeEach
     void setup() {
-        ReflectionTestUtils.setField(commentService, "contentService", contentService);
-        ReflectionTestUtils.setField(commentService, "objectMapper", objectMapper);
+        commentService = new CommentServiceImpl(commentRepository, commentTreeService, objectMapper,
+            redisTemplateEx, cassandraOperation, commentTreeRepository, accessTokenValidator, fetchUser,
+            userCommentLikeRepository, contentService, null, helperMethodService);
         ReflectionTestUtils.setField(commentService, "defaultLimit", 10);
         ReflectionTestUtils.setField(commentService, "defaultOffset", 0);
         ReflectionTestUtils.setField(commentService, "jwtSecretKey", "dummysecret");
@@ -665,8 +664,6 @@ class CommentServiceImplTest {
         commentTreeData.put(Constants.ENTITY_ID, "entity-123");
         tree.setCommentTreeData(commentTreeData);
 
-        Map<String, Object> cached = Map.of("cachedKey", "cachedValue");
-
         Mockito.when(commentTreeRepository.findById(treeId)).thenReturn(Optional.of(tree));
         Mockito.when(redisTemplateEx.opsForValue()).thenReturn(valueOperations);
         String cachedJson = "{\"cachedKey\":\"cachedValue\"}";
@@ -824,7 +821,7 @@ class CommentServiceImplTest {
         List<String> statuses = List.of("active", "suspended");
         Sort sort = Sort.by(Sort.Direction.DESC, "createdDate");
 
-        when(commentRepository.findByCommentIdInAndStatusIn(eq(commentIds), eq(statuses), eq(sort))).thenReturn(comments);
+        when(commentRepository.findByCommentIdInAndStatusIn(commentIds, statuses, sort)).thenReturn(comments);
 
         List<Object> mockUserList = List.of(Map.of("id", "user:123"));
 
@@ -1161,7 +1158,6 @@ class CommentServiceImplTest {
         Map<String, Object> commentTreeMap = new HashMap<>();
         commentTreeMap.put("firstLevelNodes", Arrays.asList("c1", "c2"));
 
-        Map<String, Object> cachedResult = Map.of("data", "cachedCommentData");
         assertNull(null);
     }
 

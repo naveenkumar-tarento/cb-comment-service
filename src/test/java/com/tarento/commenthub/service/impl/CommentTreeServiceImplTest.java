@@ -151,6 +151,7 @@ class CommentTreeServiceImplTest {
         try {
             node = mapper.readTree(json);
         } catch (Exception e) {
+            // Ignored: json literal above is valid, parsing cannot actually fail
         }
 
         JsonNode result = CommentTreeServiceImpl.findTargetNode(node, new String[]{"1", "2"}, 0);

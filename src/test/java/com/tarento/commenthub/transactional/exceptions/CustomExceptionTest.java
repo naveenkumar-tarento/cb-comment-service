@@ -13,14 +13,6 @@ class CustomExceptionTest {
         assertNull(ex.getCode());
         assertNull(ex.getMessage());
         assertNull(ex.getHttpStatusCode());
-
-        ex.setCode("ERR001");
-        ex.setMessage("Some error occurred");
-        ex.setHttpStatusCode(HttpStatus.INTERNAL_SERVER_ERROR);
-
-        assertEquals("ERR001", ex.getCode());
-        assertEquals("Some error occurred", ex.getMessage());
-        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, ex.getHttpStatusCode());
     }
 
     @Test

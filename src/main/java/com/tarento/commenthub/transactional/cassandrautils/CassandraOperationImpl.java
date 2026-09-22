@@ -1,26 +1,21 @@
 package com.tarento.commenthub.transactional.cassandrautils;
 
 import com.datastax.oss.driver.api.core.CqlSession;
-import com.datastax.oss.driver.api.core.cql.BoundStatement;
-import com.datastax.oss.driver.api.core.cql.PreparedStatement;
 import com.datastax.oss.driver.api.core.cql.ResultSet;
 import com.datastax.oss.driver.api.core.cql.SimpleStatement;
 import com.datastax.oss.driver.api.querybuilder.QueryBuilder;
-import com.datastax.oss.driver.api.querybuilder.delete.Delete;
 import com.datastax.oss.driver.api.querybuilder.select.Select;
 import com.datastax.oss.driver.api.querybuilder.term.Term;
 import com.tarento.commenthub.constant.Constants;
 import com.tarento.commenthub.transactional.utils.ApiResponse;
 
 import java.util.*;
-import java.util.Map.Entry;
 
 import java.util.stream.Collectors;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 
@@ -31,10 +26,13 @@ import org.springframework.stereotype.Component;
 @Component
 public class CassandraOperationImpl implements CassandraOperation {
 
-    private Logger logger = LoggerFactory.getLogger(getClass().getName());
+    private final Logger logger = LoggerFactory.getLogger(getClass().getName());
 
-    @Autowired
-    CassandraConnectionManager connectionManager;
+    private final CassandraConnectionManager connectionManager;
+
+    public CassandraOperationImpl(CassandraConnectionManager connectionManager) {
+        this.connectionManager = connectionManager;
+    }
 
     private Select processQuery(String keyspaceName, String tableName, Map<String, Object> propertyMap,
                                 List<String> fields) {
@@ -75,7 +73,7 @@ public class CassandraOperationImpl implements CassandraOperation {
             CqlSession session = connectionManager.getSession(keyspaceName);
             ResultSet results = session.execute(selectQuery.build());
             response = CassandraUtil.createResponse(results);
-            logger.info(response.toString());
+            logger.info("{}", response);
 
         } catch (Exception e) {
             logger.error(Constants.EXCEPTION_MSG_FETCH + tableName + " : " + e.getMessage(), e);

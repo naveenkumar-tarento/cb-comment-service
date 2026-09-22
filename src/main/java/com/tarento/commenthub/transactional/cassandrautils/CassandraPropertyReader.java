@@ -1,6 +1,6 @@
 package com.tarento.commenthub.transactional.cassandrautils;
 
-import com.igot.cb.transactional.exceptions.CassandraPropertyReaderException;
+import com.tarento.commenthub.transactional.exceptions.CassandraPropertyReaderException;
 
 import java.io.IOException;
 import java.io.InputStream;

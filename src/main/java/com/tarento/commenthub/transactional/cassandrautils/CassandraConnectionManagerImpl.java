@@ -12,14 +12,12 @@ import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metadata.schema.TableMetadata;
 import com.datastax.oss.driver.internal.core.retry.DefaultRetryPolicy;
 import com.datastax.oss.driver.internal.core.time.AtomicTimestampGenerator;
-import com.datastax.oss.driver.api.core.CqlSession;
 import com.tarento.commenthub.transactional.exceptions.CustomException;
 import com.tarento.commenthub.constant.Constants;
 import com.tarento.commenthub.transactional.utils.PropertiesCache;
 import jakarta.annotation.PostConstruct;
 import java.net.InetSocketAddress;
 import java.util.Arrays;
-import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.LogManager;
@@ -45,8 +43,9 @@ import java.util.concurrent.ConcurrentHashMap;
 @Slf4j
 public class CassandraConnectionManagerImpl implements CassandraConnectionManager {
 
+    private static final String DATACENTER_1 = "datacenter1";
+
     private static final Map<String, CqlSession> cassandraSessionMap = new ConcurrentHashMap<>(2);
-    //private static final log log = logFactory.getlog(CassandraConnectionManagerImpl.class);
     private static CqlSession session;
 
     @Override
@@ -69,7 +68,7 @@ public class CassandraConnectionManagerImpl implements CassandraConnectionManage
         createCassandraConnection();
     }
 
-    private void createCassandraConnection() {
+    private static void createCassandraConnection() {
         try {
             session = createCassandraConnectionWithKeySpaces(null);
         } catch (Exception e) {
@@ -81,7 +80,7 @@ public class CassandraConnectionManagerImpl implements CassandraConnectionManage
         }
     }
 
-    private CqlSession createCassandraConnectionWithKeySpaces(String keySpaceName) {
+    private static CqlSession createCassandraConnectionWithKeySpaces(String keySpaceName) {
         try {
             // Load the properties required for connection
             PropertiesCache cache = PropertiesCache.getInstance();
@@ -95,14 +94,14 @@ public class CassandraConnectionManagerImpl implements CassandraConnectionManage
             List<String> hosts = Arrays.asList(cassandraHost.split(","));
             List<InetSocketAddress> contactPoints = hosts.stream()
                 .map(host -> new InetSocketAddress(host.trim(), 9042)) // Assuming default port 9042
-                .collect(Collectors.toList());
+                .toList();
             List<String> contactPointsString = hosts.stream()
                 .map(host -> host.trim() + ":9042") // Ensure proper host:port format
-                .collect(Collectors.toList());
+                .toList();
             DriverConfigLoader loader = DriverConfigLoader.programmaticBuilder()
                 .withStringList(DefaultDriverOption.CONTACT_POINTS, contactPointsString)
                 .withString(DefaultDriverOption.REQUEST_CONSISTENCY, getConsistencyLevel().name())
-                .withString(DefaultDriverOption.LOAD_BALANCING_LOCAL_DATACENTER, "datacenter1")
+                .withString(DefaultDriverOption.LOAD_BALANCING_LOCAL_DATACENTER, DATACENTER_1)
                 .withInt(DefaultDriverOption.CONNECTION_POOL_LOCAL_SIZE,
                     Integer.parseInt(cache.getProperty(Constants.CORE_CONNECTIONS_PER_HOST_FOR_LOCAL)))
                 .withInt(DefaultDriverOption.CONNECTION_POOL_REMOTE_SIZE,
@@ -119,14 +118,14 @@ public class CassandraConnectionManagerImpl implements CassandraConnectionManage
             if (StringUtils.isNotBlank(keySpaceName)) {
                 sessionWithKeyspaces = CqlSession.builder()
                     .addContactPoints(contactPoints)
-                    .withLocalDatacenter("datacenter1")
+                    .withLocalDatacenter(DATACENTER_1)
                     .withKeyspace(keySpaceName)
                     .withConfigLoader(loader)
                     .build();
             } else {
                 sessionWithKeyspaces = CqlSession.builder()
                     .addContactPoints(contactPoints)
-                    .withLocalDatacenter("datacenter1")
+                    .withLocalDatacenter(DATACENTER_1)
                     .withConfigLoader(loader)
                     .build();
             }
@@ -174,7 +173,7 @@ public class CassandraConnectionManagerImpl implements CassandraConnectionManage
                 Map<CqlIdentifier, TableMetadata> tables = metadata.getKeyspace(keyspaceName).get().getTables();
                 return tables.keySet().stream()
                     .map(CqlIdentifier::toString)
-                    .collect(Collectors.toList());
+                    .toList();
             } else {
                 throw new CustomException(
                     Constants.ERROR,

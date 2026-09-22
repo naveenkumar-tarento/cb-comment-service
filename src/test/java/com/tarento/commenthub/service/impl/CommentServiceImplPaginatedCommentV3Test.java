@@ -14,7 +14,6 @@ import com.tarento.commenthub.repository.CommentTreeRepository;
 import com.tarento.commenthub.transactional.utils.ApiResponse;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
@@ -47,7 +46,6 @@ class CommentServiceImplPaginatedCommentV3Test {
     @Mock
     private ObjectMapper objectMapper;
 
-    @InjectMocks
     private CommentServiceImpl commentService;
 
 
@@ -59,6 +57,8 @@ class CommentServiceImplPaginatedCommentV3Test {
 
     @BeforeEach
     void setUp() {
+        commentService = new CommentServiceImpl(commentRepository, null, objectMapper, redisTemplate,
+            null, commentTreeRepository, null, fetchUser, null, null, null, null);
         ReflectionTestUtils.setField(commentService, "jwtSecretKey", "testSecret");
         ReflectionTestUtils.setField(commentService, "redisTtl", 3600L);
     }

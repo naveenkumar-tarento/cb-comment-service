@@ -10,7 +10,6 @@ import com.tarento.commenthub.transactional.cassandrautils.CassandraOperation;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -30,13 +29,14 @@ class CommentServiceImplFetchUsersByCommentDataTest {
     @Mock
     private ObjectMapper objectMapper;
 
-    @InjectMocks
     private CommentServiceImpl commentService;
 
     private Method fetchUsersByCommentDataMethod;
 
     @BeforeEach
     void setUp() throws Exception {
+        commentService = new CommentServiceImpl(null, null, objectMapper, null, cassandraOperation,
+            null, null, null, null, null, null, null);
         fetchUsersByCommentDataMethod = CommentServiceImpl.class.getDeclaredMethod("fetchUsersByCommentData", List.class);
         fetchUsersByCommentDataMethod.setAccessible(true);
     }
