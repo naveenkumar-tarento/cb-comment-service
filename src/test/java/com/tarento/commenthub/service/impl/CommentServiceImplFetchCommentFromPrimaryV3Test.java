@@ -42,7 +42,7 @@ class CommentServiceImplFetchCommentFromPrimaryV3Test {
     @BeforeEach
     void setUp() throws Exception {
         commentService = new CommentServiceImpl(commentRepository, null, objectMapper, null, null,
-            null, null, fetchUser, null, null, null, null);
+            null, null, fetchUser, null, null, null);
         fetchCommentFromPrimaryV3Method = CommentServiceImpl.class.getDeclaredMethod(
                 "fetchCommentFromPrimaryV3", int.class, int.class, List.class, String.class);
         fetchCommentFromPrimaryV3Method.setAccessible(true);

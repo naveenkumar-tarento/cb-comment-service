@@ -44,7 +44,6 @@ import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 import com.tarento.commenthub.utility.notificationutill.HelperMethodService;
-import com.tarento.commenthub.utility.notificationutill.NotificationTriggerService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -92,8 +91,6 @@ public class CommentServiceImpl implements CommentService {
 
   private final ContentService contentService;
 
-  private final NotificationTriggerService notificationTriggerService;
-
   private final HelperMethodService helperMethodService;
 
   public CommentServiceImpl(CommentRepository commentRepository,
@@ -106,7 +103,6 @@ public class CommentServiceImpl implements CommentService {
       FetchUserDetails fetchUser,
       UserCommentLikeRepository userCommentLikeRepository,
       ContentService contentService,
-      NotificationTriggerService notificationTriggerService,
       HelperMethodService helperMethodService) {
     this.commentRepository = commentRepository;
     this.commentTreeService = commentTreeService;
@@ -118,7 +114,6 @@ public class CommentServiceImpl implements CommentService {
     this.fetchUser = fetchUser;
     this.userCommentLikeRepository = userCommentLikeRepository;
     this.contentService = contentService;
-    this.notificationTriggerService = notificationTriggerService;
     this.helperMethodService = helperMethodService;
   }
 
@@ -577,9 +572,9 @@ public class CommentServiceImpl implements CommentService {
   private Map<String, Object> readJsonMapFromRedis(String key) {
     try {
       // Retrieve JSON string from Redis
-      String resultMapJson = (String) redisTemplate.opsForValue().get(key);
+      String resultMapJson = redisTemplate.opsForValue().get(key);
       if (resultMapJson == null) {
-        return null;
+        return Collections.emptyMap();
       }
       // Deserialize JSON string to Map
       return objectMapper.readValue(resultMapJson, new TypeReference<Map<String, Object>>() {});
@@ -825,7 +820,7 @@ public class CommentServiceImpl implements CommentService {
   private Map<String, Object> readCommentTreeMapFromRedis(String commentTreeId) {
     try {
       // Attempt to fetch from Redis
-      String cachedData = (String) redisTemplate.opsForValue().get(Constants.COMMENT_TREE_REDIS_KEY + commentTreeId);
+      String cachedData = redisTemplate.opsForValue().get(Constants.COMMENT_TREE_REDIS_KEY + commentTreeId);
       if (cachedData != null) {
         return objectMapper.readValue(cachedData, new TypeReference<Map<String, Object>>() {});
       }
@@ -856,14 +851,14 @@ public class CommentServiceImpl implements CommentService {
   private Map<String, Object> readPaginatedResultFromRedis(String redisKey, String commentTreeId) {
     try {
       // Attempt to fetch paginated data from Redis
-      String cachedResult = (String) redisTemplate.opsForValue().get(redisKey);
+      String cachedResult = redisTemplate.opsForValue().get(redisKey);
       if (cachedResult != null) {
         return objectMapper.readValue(cachedResult, new TypeReference<Map<String, Object>>() {});
       }
     } catch (Exception e) {
       log.error("Error occurred while fetching paginated data from Redis for commentTreeId: {}", commentTreeId, e);
     }
-    return null;
+    return Collections.emptyMap();
   }
 
   private void cachePaginatedResultInRedis(String redisKey, Map<String, Object> resultMap, String commentTreeId) {

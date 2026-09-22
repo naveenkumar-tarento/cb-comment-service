@@ -116,7 +116,7 @@ class CommentServiceImplTest {
     void setup() {
         commentService = new CommentServiceImpl(commentRepository, commentTreeService, objectMapper,
             redisTemplateEx, cassandraOperation, commentTreeRepository, accessTokenValidator, fetchUser,
-            userCommentLikeRepository, contentService, null, helperMethodService);
+            userCommentLikeRepository, contentService, helperMethodService);
         ReflectionTestUtils.setField(commentService, "defaultLimit", 10);
         ReflectionTestUtils.setField(commentService, "defaultOffset", 0);
         ReflectionTestUtils.setField(commentService, "jwtSecretKey", "dummysecret");

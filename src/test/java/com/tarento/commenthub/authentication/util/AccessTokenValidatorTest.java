@@ -6,10 +6,8 @@ import com.tarento.commenthub.constant.Constants;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.keycloak.common.util.Time;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
-import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.lang.reflect.Field;
@@ -33,10 +31,8 @@ class AccessTokenValidatorTest {
     @Mock
     private PublicKey mockPublicKey;
 
-    @InjectMocks
     private AccessTokenValidator accessTokenValidator;
 
-    @Spy
     private AccessTokenValidator spyAccessTokenValidator;
 
     private static final ObjectMapper mapper = new ObjectMapper();
@@ -49,6 +45,9 @@ class AccessTokenValidatorTest {
 
     @BeforeEach
     void setUp() throws Exception {
+        accessTokenValidator = new AccessTokenValidator(keyManager);
+        spyAccessTokenValidator = spy(new AccessTokenValidator(keyManager));
+
         // Mock PropertiesCache.getInstance().getProperty(...) if needed
         // Generate tokens for different scenarios
         expiredToken = generateToken("expiredUserId", Time.currentTime() - 1000, "expectedIssuer");

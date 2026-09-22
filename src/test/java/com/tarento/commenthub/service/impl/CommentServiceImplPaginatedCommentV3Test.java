@@ -58,7 +58,7 @@ class CommentServiceImplPaginatedCommentV3Test {
     @BeforeEach
     void setUp() {
         commentService = new CommentServiceImpl(commentRepository, null, objectMapper, redisTemplate,
-            null, commentTreeRepository, null, fetchUser, null, null, null, null);
+            null, commentTreeRepository, null, fetchUser, null, null, null);
         ReflectionTestUtils.setField(commentService, "jwtSecretKey", "testSecret");
         ReflectionTestUtils.setField(commentService, "redisTtl", 3600L);
     }

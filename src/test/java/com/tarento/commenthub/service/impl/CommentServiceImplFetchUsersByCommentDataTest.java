@@ -36,7 +36,7 @@ class CommentServiceImplFetchUsersByCommentDataTest {
     @BeforeEach
     void setUp() throws Exception {
         commentService = new CommentServiceImpl(null, null, objectMapper, null, cassandraOperation,
-            null, null, null, null, null, null, null);
+            null, null, null, null, null, null);
         fetchUsersByCommentDataMethod = CommentServiceImpl.class.getDeclaredMethod("fetchUsersByCommentData", List.class);
         fetchUsersByCommentDataMethod.setAccessible(true);
     }
