@@ -2,17 +2,21 @@ package com.tarento.commenthub.transactional.cassandrautils;
 
 import com.tarento.commenthub.transactional.exceptions.CassandraPropertyReaderException;
 
+import jakarta.annotation.PostConstruct;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.springframework.stereotype.Component;
 
 /**
  * @author Mahesh RV
  * @author Ruksana
  */
+@Component 
 public class CassandraPropertyReader {
 
     private static final String FILE_NAME = "cassandratablecolumn.properties";
@@ -31,6 +35,7 @@ public class CassandraPropertyReader {
     /**
      * Loads properties from the configuration file into the properties object.
      */
+    @PostConstruct 
     private void loadProperties() {
         try (InputStream in = getClass().getClassLoader().getResourceAsStream(FILE_NAME)) {
             if (in != null) {

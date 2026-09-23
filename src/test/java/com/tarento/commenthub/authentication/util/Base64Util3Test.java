@@ -2,6 +2,8 @@ package com.tarento.commenthub.authentication.util;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.lang.reflect.Field;
 
@@ -24,23 +26,18 @@ class Base64Util3Test {
         field.set(decoder, value);
     }
 
-    @Test
-    void testValidCompleteBase64() {
-        byte[] input = "TWFu".getBytes(); // "Man"
-        boolean result = decoder.process(input, 0, input.length, true);
-        assertTrue(result);
-    }
-
-    @Test
-    void testValidPartialBase64_OnePad() {
-        byte[] input = "TWE=".getBytes(); // "Ma"
-        boolean result = decoder.process(input, 0, input.length, true);
-        assertTrue(result);
-    }
-
-    @Test
-    void testValidPartialBase64_TwoPads() {
-        byte[] input = "TQ==".getBytes(); // "M"
+    @ParameterizedTest
+    @ValueSource(strings = {
+        "TWFu",  // "Man" - complete base64
+        "TWE=",  // "Ma" - one padding char
+        "TQ==",  // "M" - two padding chars
+        "#WFu",  // invalid character
+        "",      // empty input
+        "TW==",  // state 2 to 4 transition
+        "TWF="   // state 3 to 5 transition
+    })
+    void testValidBase64Inputs(String encoded) {
+        byte[] input = encoded.getBytes();
         boolean result = decoder.process(input, 0, input.length, true);
         assertTrue(result);
     }
@@ -50,13 +47,6 @@ class Base64Util3Test {
         byte[] input = "TQ===".getBytes(); // Invalid
         boolean result = decoder.process(input, 0, input.length, true);
         assertFalse(result);
-    }
-
-    @Test
-    void testInvalidChar_shouldFail() {
-        byte[] input = "#WFu".getBytes(); // Invalid character
-        boolean result = decoder.process(input, 0, input.length, true);
-        assertTrue(result);
     }
 
     @Test
@@ -91,27 +81,6 @@ class Base64Util3Test {
     void testWebSafeDecoder() {
         decoder = new Base64Util.Decoder(Base64Util.URL_SAFE, output);
         byte[] input = "TWF-".getBytes(); // URL-safe variant
-        boolean result = decoder.process(input, 0, input.length, true);
-        assertTrue(result);
-    }
-
-    @Test
-    void testEmptyInput() {
-        byte[] input = new byte[0];
-        boolean result = decoder.process(input, 0, input.length, true);
-        assertTrue(result);
-    }
-
-    @Test
-    void testState2ToState4Transition() {
-        byte[] input = "TW==".getBytes(); // Should transition from state 2 to 4
-        boolean result = decoder.process(input, 0, input.length, true);
-        assertTrue(result);
-    }
-
-    @Test
-    void testState3ToState5Transition() {
-        byte[] input = "TWF=".getBytes(); // Should transition from state 3 to 5
         boolean result = decoder.process(input, 0, input.length, true);
         assertTrue(result);
     }
