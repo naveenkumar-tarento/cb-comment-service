@@ -698,7 +698,7 @@ class CommentServiceImplTest {
         when(commentRepository.findById(COMMENT_ID)).thenReturn(Optional.of(comment));
         when(commentRepository.save(any(Comment.class))).thenAnswer(i -> i.getArguments()[0]);
         doThrow(new RuntimeException("Tree update failed")).when(commentTreeService)
-                .updateCommentTreeForDeletedComment(eq(COMMENT_ID), eq(identifierDTO), eq(PARENT_ID));
+                .updateCommentTreeForDeletedComment(COMMENT_ID, identifierDTO, PARENT_ID);
 
         // Act & Assert
         CommentException exception = assertThrows(CommentException.class,
