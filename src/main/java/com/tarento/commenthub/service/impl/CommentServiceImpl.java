@@ -669,22 +669,14 @@ public class CommentServiceImpl implements CommentService {
   @Override
   public ApiResponse reportComment(Map<String, Object> request, String token) {
     log.info("CommentServiceImpl:reportComment::inside the method");
+    ReportValidationResult validation = validateAndFetchReportedComment(request, token);
+    if (validation.isError()) {
+      return validation.errorResponse();
+    }
+    String userId = validation.userId();
+    Comment comment = validation.comment();
     ApiResponse response = new ApiResponse();
     response.setResponseCode(HttpStatus.OK);
-    String userId = accessTokenValidator.verifyUserToken(token);
-    if (StringUtils.isBlank(userId) || userId.equalsIgnoreCase(Constants.UNAUTHORIZED_USER)) {
-      return returnErrorMsg(Constants.INVALID_USER, HttpStatus.BAD_REQUEST, response);
-    }
-    String error = validateReportCommentPayload(request);
-    if (StringUtils.isNotBlank(error)) {
-      return returnErrorMsg(error, HttpStatus.BAD_REQUEST, response);
-    }
-    Optional<Comment> fetchedComment = commentRepository.findById(
-        (String) request.get(Constants.COMMENT_ID));
-    if (!fetchedComment.isPresent()) {
-      return returnErrorMsg(Constants.NOT_FOUND, HttpStatus.NOT_FOUND, response);
-    }
-    Comment comment = fetchedComment.get();
     if (!comment.getStatus().equalsIgnoreCase(Status.ACTIVE.name())) {
       return returnErrorMsg(Constants.NOT_ACTIVE_STATUS, HttpStatus.NOT_FOUND, response);
     }
@@ -712,22 +704,14 @@ public class CommentServiceImpl implements CommentService {
   @Override
   public ApiResponse deleteReportedComments(Map<String, Object> request, String token) {
     log.info("CommentServiceImpl:reportComment::inside the method");
+    ReportValidationResult validation = validateAndFetchReportedComment(request, token);
+    if (validation.isError()) {
+      return validation.errorResponse();
+    }
+    String userId = validation.userId();
+    Comment comment = validation.comment();
     ApiResponse response = new ApiResponse();
     response.setResponseCode(HttpStatus.OK);
-    String userId = accessTokenValidator.verifyUserToken(token);
-    if (StringUtils.isBlank(userId) || userId.equalsIgnoreCase(Constants.UNAUTHORIZED_USER)) {
-      return returnErrorMsg(Constants.INVALID_USER, HttpStatus.BAD_REQUEST, response);
-    }
-    String error = validateReportCommentPayload(request);
-    if (StringUtils.isNotBlank(error)) {
-      return returnErrorMsg(error, HttpStatus.BAD_REQUEST, response);
-    }
-    Optional<Comment> fetchedComment = commentRepository.findById(
-        (String) request.get(Constants.COMMENT_ID));
-    if (!fetchedComment.isPresent()) {
-      return returnErrorMsg(Constants.NOT_FOUND, HttpStatus.NOT_FOUND, response);
-    }
-    Comment comment = fetchedComment.get();
     if (!comment.getStatus().equalsIgnoreCase(Status.SUSPENDED.name())) {
       return returnErrorMsg(Constants.NOT_SUSPENDED_STATUS, HttpStatus.NOT_FOUND, response);
     }
@@ -737,6 +721,34 @@ public class CommentServiceImpl implements CommentService {
     comment = commentRepository.save(comment);
     response.setResult(objectMapper.convertValue(comment, Map.class));
     return response;
+  }
+
+  private ReportValidationResult validateAndFetchReportedComment(Map<String, Object> request, String token) {
+    ApiResponse response = new ApiResponse();
+    response.setResponseCode(HttpStatus.OK);
+    String userId = accessTokenValidator.verifyUserToken(token);
+    if (StringUtils.isBlank(userId) || userId.equalsIgnoreCase(Constants.UNAUTHORIZED_USER)) {
+      return new ReportValidationResult(null, null,
+          returnErrorMsg(Constants.INVALID_USER, HttpStatus.BAD_REQUEST, response));
+    }
+    String error = validateReportCommentPayload(request);
+    if (StringUtils.isNotBlank(error)) {
+      return new ReportValidationResult(null, null,
+          returnErrorMsg(error, HttpStatus.BAD_REQUEST, response));
+    }
+    Optional<Comment> fetchedComment = commentRepository.findById(
+        (String) request.get(Constants.COMMENT_ID));
+    if (!fetchedComment.isPresent()) {
+      return new ReportValidationResult(null, null,
+          returnErrorMsg(Constants.NOT_FOUND, HttpStatus.NOT_FOUND, response));
+    }
+    return new ReportValidationResult(userId, fetchedComment.get(), null);
+  }
+
+  private record ReportValidationResult(String userId, Comment comment, ApiResponse errorResponse) {
+    boolean isError() {
+      return errorResponse != null;
+    }
   }
 
   @Override
