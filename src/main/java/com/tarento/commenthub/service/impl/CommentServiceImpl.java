@@ -1014,7 +1014,7 @@ public class CommentServiceImpl implements CommentService {
         Constants.KEYSPACE_SUNBIRD, Constants.TABLE_USER, propertyMap,
         Arrays.asList(Constants.PROFILE_DETAILS, Constants.FIRST_NAME, Constants.ID), null);
 
-    List<Map<String, Object>> userList = userInfoList.stream()
+    return userInfoList.stream()
         .map(userInfo -> {
           Map<String, Object> userMap = new HashMap<>();
 
@@ -1048,7 +1048,6 @@ public class CommentServiceImpl implements CommentService {
           return userMap;
         })
         .toList();
-    return userList;
   }
 
   public String generateRedisJwtTokenKey(String commentTreeId, Integer offset, Integer limit) {
