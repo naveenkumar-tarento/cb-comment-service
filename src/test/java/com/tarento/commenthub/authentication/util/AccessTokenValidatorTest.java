@@ -214,6 +214,86 @@ class AccessTokenValidatorTest {
 
 
     @Test
+    void testVerifyUserToken_validSignature_expiredExp_returnsUnauthorized() throws Exception {
+        Field realmUrlField = AccessTokenValidator.class.getDeclaredField("REALM_URL");
+        realmUrlField.setAccessible(true);
+        String validIssuer = (String) realmUrlField.get(null);
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("iss", validIssuer);
+        payload.put(Constants.SUB, "user:abc");
+        payload.put("exp", Time.currentTime() - 5000);
+
+        String token = mockToken(payload);
+
+        PublicKey localPublicKey = mock(PublicKey.class);
+        KeyData keyData = new KeyData("testKeyId", localPublicKey);
+        when(keyManager.getPublicKey(anyString())).thenReturn(keyData);
+
+        try (MockedStatic<CryptoUtil> cryptoUtilMock = mockStatic(CryptoUtil.class)) {
+            cryptoUtilMock.when(() ->
+                    CryptoUtil.verifyRSASign(anyString(), any(), eq(localPublicKey), eq(Constants.SHA_256_WITH_RSA))
+            ).thenReturn(true);
+
+            String result = accessTokenValidator.verifyUserToken(token);
+
+            assertEquals(Constants.UNAUTHORIZED_USER, result);
+        }
+    }
+
+    @Test
+    void testCheckIss_mismatchedIssuer_returnsFalse() throws Exception {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("iss", "http://some-other-issuer");
+        payload.put(Constants.SUB, "user:abc");
+        payload.put("exp", Time.currentTime() + 5000);
+
+        String token = mockToken(payload);
+
+        PublicKey localPublicKey = mock(PublicKey.class);
+        KeyData keyData = new KeyData("testKeyId", localPublicKey);
+        when(keyManager.getPublicKey(anyString())).thenReturn(keyData);
+
+        try (MockedStatic<CryptoUtil> cryptoUtilMock = mockStatic(CryptoUtil.class)) {
+            cryptoUtilMock.when(() ->
+                    CryptoUtil.verifyRSASign(anyString(), any(), eq(localPublicKey), eq(Constants.SHA_256_WITH_RSA))
+            ).thenReturn(true);
+
+            String result = accessTokenValidator.verifyUserToken(token);
+
+            assertEquals(Constants.UNAUTHORIZED_USER, result);
+        }
+    }
+
+    @Test
+    void testVerifyUserToken_exceptionDuringPayloadProcessing_returnsUnauthorized() throws Exception {
+        Field realmUrlField = AccessTokenValidator.class.getDeclaredField("REALM_URL");
+        realmUrlField.setAccessible(true);
+        String validIssuer = (String) realmUrlField.get(null);
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("iss", validIssuer);
+        payload.put(Constants.SUB, 12345);
+        payload.put("exp", Time.currentTime() + 5000);
+
+        String token = mockToken(payload);
+
+        PublicKey localPublicKey = mock(PublicKey.class);
+        KeyData keyData = new KeyData("testKeyId", localPublicKey);
+        when(keyManager.getPublicKey(anyString())).thenReturn(keyData);
+
+        try (MockedStatic<CryptoUtil> cryptoUtilMock = mockStatic(CryptoUtil.class)) {
+            cryptoUtilMock.when(() ->
+                    CryptoUtil.verifyRSASign(anyString(), any(), eq(localPublicKey), eq(Constants.SHA_256_WITH_RSA))
+            ).thenReturn(true);
+
+            String result = accessTokenValidator.verifyUserToken(token);
+
+            assertEquals(Constants.UNAUTHORIZED_USER, result);
+        }
+    }
+
+    @Test
     void testDecodeFromBase64() throws Exception {
         Method method = AccessTokenValidator.class.getDeclaredMethod("decodeFromBase64", String.class);
         method.setAccessible(true);

@@ -75,39 +75,39 @@ class KeyManagerTest {
     void testInit_SuccessfulKeyLoading() {
         // Create a mock Path for the test key file
         Path mockKeyPath = mock(Path.class);
-        
+
         // Mock the Files.walk method
         try (MockedStatic<Files> filesMock = Mockito.mockStatic(Files.class);
              MockedStatic<Paths> pathsMock = Mockito.mockStatic(Paths.class);
              MockedStatic<PropertiesCache> propertiesCacheMock = Mockito.mockStatic(PropertiesCache.class)) {
-            
+
             // Mock PropertiesCache.getInstance
             propertiesCacheMock.when(PropertiesCache::getInstance).thenReturn(propertiesCache);
-            
+
             // Mock Paths.get to return our mock path
             Path basePath = mock(Path.class);
             pathsMock.when(() -> Paths.get(TEST_BASE_PATH)).thenReturn(basePath);
             pathsMock.when(() -> Paths.get(anyString())).thenReturn(mockKeyPath);
-            
+
             // Mock Files.walk to return a stream with our test file
             Stream<Path> mockStream = Stream.of(mockKeyPath);
             filesMock.when(() -> Files.walk(basePath)).thenReturn(mockStream);
-            
+
             // Mock Files.isRegularFile to return true for our test path
             filesMock.when(() -> Files.isRegularFile(mockKeyPath)).thenReturn(true);
-            
+
             // Mock Files.readAllLines to return our test public key content
             List<String> keyLines = Arrays.asList(TEST_PUBLIC_KEY.split("\n"));
             filesMock.when(() -> Files.readAllLines(mockKeyPath, StandardCharsets.UTF_8)).thenReturn(keyLines);
-            
+
             // Mock the loadPublicKey method
             try (MockedStatic<KeyManager> keyManagerMock = Mockito.mockStatic(KeyManager.class)) {
                 PublicKey mockPublicKey = mock(PublicKey.class);
                 keyManagerMock.when(() -> KeyManager.loadPublicKey(anyString())).thenReturn(mockPublicKey);
-                
+
                 // Call the init method
                 keyManager.init();
-                
+
                 // Verify the key was added to the keyMap
                 KeyData keyData = keyManager.getPublicKey(TEST_KEY_ID);
                 assertNull(keyData);

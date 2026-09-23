@@ -424,6 +424,39 @@ class CommentTreeServiceImplTest {
     }
 
     @Test
+    void testUpdateCommentTree_whenParentHasNoExistingChildren_createsChildrenArray() throws Exception {
+        JsonNode payload = createPayload(true);
+
+        ObjectMapper realMapper = new ObjectMapper();
+        ObjectNode comment1 = realMapper.createObjectNode();
+        comment1.put(Constants.COMMENT_ID, "parent1");
+        // Intentionally no "children" array on this comment yet
+
+        ArrayNode comments = realMapper.createArrayNode().add(comment1);
+        ObjectNode treeData = realMapper.createObjectNode();
+        treeData.set(Constants.COMMENTS, comments);
+        treeData.putArray(Constants.CHILD_NODES);
+        treeData.putArray(Constants.FIRST_LEVEL_NODES);
+
+        CommentTree commentTree = new CommentTree();
+        commentTree.setCommentTreeId("tree123");
+        commentTree.setCommentTreeData(treeData);
+
+        Mockito.when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(objectMapper.createObjectNode()).thenReturn(new ObjectMapper().createObjectNode());
+        when(commentTreeRepository.findById("tree123")).thenReturn(Optional.of(commentTree));
+        when(objectMapper.treeToValue(any(), eq(String[].class))).thenReturn(new String[]{"parent1"});
+        when(commentTreeRepository.save(any())).thenReturn(commentTree);
+        when(objectMapper.convertValue(any(), eq(Map.class))).thenReturn(new HashMap<>());
+
+        CommentTree result = commentTreeService.updateCommentTree(payload);
+
+        assertNotNull(result);
+        assertTrue(comment1.has(Constants.CHILDREN));
+        assertEquals(1, comment1.get(Constants.CHILDREN).size());
+    }
+
+    @Test
     void testUpdateCommentTree_whenWrongHierarchyPath_thenThrowsException() throws Exception {
         JsonNode payload = createPayload(true);
         ObjectNode treeData = createExistingCommentTreeData();

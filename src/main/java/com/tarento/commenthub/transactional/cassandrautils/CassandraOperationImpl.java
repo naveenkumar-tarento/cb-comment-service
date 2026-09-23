@@ -99,24 +99,6 @@ public class CassandraOperationImpl implements CassandraOperation {
         }
         return response;
     }
-    @Override
-    public List<Map<String, Object>> getRecordsByPropertiesWithoutFiltering(String keyspaceName, String tableName, Map<String, Object> propertyMap, List<String> fields, Integer limit) {
-        List<Map<String, Object>> response = new ArrayList<>();
-        try {
-            Select selectQuery = null;
-            selectQuery = processQuery(keyspaceName, tableName, propertyMap, fields);
-
-            if (limit != null) selectQuery = selectQuery.limit(limit);
-            String queryString = selectQuery.toString();
-            SimpleStatement statement = SimpleStatement.newInstance(queryString);
-            ResultSet results = connectionManager.getSession(keyspaceName).execute(statement);
-            response = CassandraUtil.createResponse(results);
-
-        } catch (Exception e) {
-            logger.error("Error fetching records from {}: {}", tableName, e.getMessage());
-        }
-        return response;
-    }
 
     private Select processQueryWithoutFiltering(String keyspaceName, String tableName, Map<String, Object> propertyMap,
         List<String> fields) {
@@ -144,6 +126,25 @@ public class CassandraOperationImpl implements CassandraOperation {
             }
         }
         return selectQuery;
+    }
+
+    @Override
+    public List<Map<String, Object>> getRecordsByPropertiesWithoutFiltering(String keyspaceName, String tableName, Map<String, Object> propertyMap, List<String> fields, Integer limit) {
+        List<Map<String, Object>> response = new ArrayList<>();
+        try {
+            Select selectQuery = null;
+            selectQuery = processQuery(keyspaceName, tableName, propertyMap, fields);
+
+            if (limit != null) selectQuery = selectQuery.limit(limit);
+            String queryString = selectQuery.toString();
+            SimpleStatement statement = SimpleStatement.newInstance(queryString);
+            ResultSet results = connectionManager.getSession(keyspaceName).execute(statement);
+            response = CassandraUtil.createResponse(results);
+
+        } catch (Exception e) {
+            logger.error("Error fetching records from {}: {}", tableName, e.getMessage());
+        }
+        return response;
     }
 
 

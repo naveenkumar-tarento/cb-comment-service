@@ -242,6 +242,31 @@ class NotificationTriggerServiceTest {
     }
 
     @Test
+    void testTriggerNotification_CatchesExceptionFromSendNotification() {
+        NotificationTriggerService spyService =
+                spy(new NotificationTriggerService(restTemplate, serverConfig, objectMapper));
+
+        String subCategory = "ENGAGEMENT";
+        String subType = "COMMENT";
+        List<String> userIds = Arrays.asList("user1");
+        String userName = "John Doe";
+        String title = "Test Course";
+        Map<String, Object> data = new HashMap<>();
+
+        ObjectNode mockPlaceholders = realObjectMapper.createObjectNode();
+        mockPlaceholders.put(Constants.TITLE, title);
+        mockPlaceholders.put(Constants.USER_NAME, userName);
+
+        when(objectMapper.createObjectNode()).thenReturn(mockPlaceholders);
+        doThrow(new RuntimeException("unexpected failure"))
+                .when(spyService).sendNotification(eq(subCategory), eq(subType), eq(userIds), anyMap());
+
+        assertDoesNotThrow(() -> spyService.triggerNotification(subCategory, subType, userIds, userName, title, data));
+
+        verify(spyService).sendNotification(eq(subCategory), eq(subType), eq(userIds), anyMap());
+    }
+
+    @Test
     void testTriggerNotification_WithNullValues() {
         String subCategory = "ENGAGEMENT";
         String subType = "COMMENT";

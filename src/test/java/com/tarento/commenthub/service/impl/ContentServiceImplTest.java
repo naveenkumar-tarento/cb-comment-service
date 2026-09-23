@@ -246,6 +246,27 @@ class ContentServiceImplTest {
     }
 
     @Test
+    void fetchResult_SuccessfulResponse_WithDebugLoggingEnabled_ReturnsResponse() {
+        ch.qos.logback.classic.Logger logger =
+                (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(ContentServiceImpl.class);
+        ch.qos.logback.classic.Level originalLevel = logger.getLevel();
+        logger.setLevel(ch.qos.logback.classic.Level.DEBUG);
+        try {
+            String uri = "http://test-uri.com";
+            Map<String, Object> expectedResponse = new HashMap<>();
+            expectedResponse.put("key", "value");
+            when(restTemplate.getForObject(uri, Map.class)).thenReturn(expectedResponse);
+
+            Object actualResponse = contentService.fetchResult(uri);
+
+            assertNotNull(actualResponse);
+            assertEquals(expectedResponse, actualResponse);
+        } finally {
+            logger.setLevel(originalLevel);
+        }
+    }
+
+    @Test
     void fetchResult_HttpClientErrorException_ReturnsErrorResponse() {
         String uri = "http://test-uri.com";
         String errorResponse = "{\"error\":\"Not Found\"}";

@@ -85,4 +85,55 @@ class Base64Util3Test {
         assertTrue(result);
     }
 
+    @Test
+    void testLeadingPaddingCharAtState0_Fails() {
+        // '=' as the very first byte is illegal in state 0
+        byte[] input = "=".getBytes();
+        assertFalse(decoder.process(input, 0, input.length, true));
+    }
+
+    @Test
+    void testPaddingCharAtState1_Fails() {
+        // one valid char moves state 0 -> 1, then '=' is illegal in state 1
+        byte[] input = "A=".getBytes();
+        assertFalse(decoder.process(input, 0, input.length, true));
+    }
+
+    @Test
+    void testSlowPathState3ValidData_Succeeds() {
+        // Embedded whitespace forces the slow per-byte path (bypassing the
+        // fast 4-byte loop) so state 3's "emit output triple" branch is exercised.
+        byte[] input = "TW Fu".getBytes();
+        assertTrue(decoder.process(input, 0, input.length, true));
+    }
+
+    @Test
+    void testDataCharAtState4InsteadOfPadding_Fails() {
+        // After one '=' (state 4), a real data character instead of the
+        // second '=' is illegal.
+        byte[] input = "TQ=A".getBytes();
+        assertFalse(decoder.process(input, 0, input.length, true));
+    }
+
+    @Test
+    void testDecoderMaxOutputSize() {
+        assertEquals(10 * 3 / 4 + 10, decoder.maxOutputSize(10));
+    }
+
+    @Test
+    void testEncodeNoPadding_LengthMultipleOfThree() {
+        byte[] input = "Man".getBytes(); // length 3, len % 3 == 0
+        byte[] result = Base64Util.encode(input, Base64Util.NO_PADDING | Base64Util.NO_WRAP);
+        assertNotNull(result);
+        assertEquals("TWFu", new String(result));
+    }
+
+    @Test
+    void testEncodeNoPadding_LengthRemainderTwo() {
+        byte[] input = "Ma".getBytes(); // length 2, len % 3 == 2
+        byte[] result = Base64Util.encode(input, Base64Util.NO_PADDING | Base64Util.NO_WRAP);
+        assertNotNull(result);
+        assertEquals("TWE", new String(result));
+    }
+
 }
