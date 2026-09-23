@@ -110,7 +110,7 @@ public class ContentServiceImpl implements ContentService {
       log.info("ContentServiceImpl::readContent:read the content");
       return (Map<String, Object>) contentResult.get(Constants.CONTENT);
     }
-    return null;
+    return Collections.emptyMap();
   }
 
   public Object fetchResult(String uri) {

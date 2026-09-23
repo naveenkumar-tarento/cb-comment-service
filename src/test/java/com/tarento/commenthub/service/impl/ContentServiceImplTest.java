@@ -183,7 +183,8 @@ class ContentServiceImplTest {
         response.put(Constants.RESPONSE_CODE, "ERROR");
         when(restTemplate.getForObject(anyString(), eq(Map.class))).thenReturn(response);
         Map<String, Object> actualContent = contentService.readContent(CONTENT_ID, fields);
-        assertNull(actualContent);
+        assertNotNull(actualContent);
+        assertTrue(actualContent.isEmpty());
     }
 
     @Test
@@ -195,7 +196,8 @@ class ContentServiceImplTest {
         when(restTemplate.getForObject(anyString(), eq(Map.class))).thenThrow(new RestClientException("Connection failed"));
         Map<String, Object> actualContent = contentService.readContent(CONTENT_ID, fields);
 
-        assertNull(actualContent);
+        assertNotNull(actualContent);
+        assertTrue(actualContent.isEmpty());
     }
 
     @Test
@@ -227,7 +229,8 @@ class ContentServiceImplTest {
         when(serverConfig.getContentReadEndPointFields()).thenReturn("/fields");
         when(restTemplate.getForObject(anyString(), eq(Map.class))).thenReturn(null);
         Map<String, Object> actualContent = contentService.readContent(CONTENT_ID, fields);
-        assertNull(actualContent);
+        assertNotNull(actualContent);
+        assertTrue(actualContent.isEmpty());
     }
 
     @Test
@@ -340,7 +343,8 @@ class ContentServiceImplTest {
         Map<String, Object> actualResponse = contentService.readContent(null);
 
         // Assert
-        assertNull(actualResponse);
+        assertNotNull(actualResponse);
+        assertTrue(actualResponse.isEmpty());
     }
 
     @Test
@@ -349,7 +353,8 @@ class ContentServiceImplTest {
         Map<String, Object> actualResponse = contentService.readContent("");
 
         // Assert
-        assertNull(actualResponse);
+        assertNotNull(actualResponse);
+        assertTrue(actualResponse.isEmpty());
     }
 
     @Test
@@ -367,7 +372,8 @@ class ContentServiceImplTest {
         Map<String, Object> actualResponse = contentService.readContent(contentId);
 
         // Assert
-        assertNull(actualResponse);
+        assertNotNull(actualResponse);
+        assertTrue(actualResponse.isEmpty());
     }
 
     @Test

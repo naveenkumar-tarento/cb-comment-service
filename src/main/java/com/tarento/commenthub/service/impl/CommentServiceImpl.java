@@ -780,11 +780,11 @@ public class CommentServiceImpl implements CommentService {
     String commentTreeId = resolveCommentTreeId(searchCriteria);
 
     Map<String, Object> commentResultMap = readCommentTreeMapFromRedis(commentTreeId);
-    if (commentResultMap == null) {
+    if (MapUtils.isEmpty(commentResultMap)) {
       log.info("CommentTreeService::getCommentTree:not found in redis");
       commentResultMap = fetchAndCacheCommentTreeMap(commentTreeId);
     }
-    if (commentResultMap == null) {
+    if (MapUtils.isEmpty(commentResultMap)) {
       return returnErrorMsg(COMMENT_TREE_NOT_FOUND_MSG, HttpStatus.NOT_FOUND, response);
     }
 
@@ -827,13 +827,13 @@ public class CommentServiceImpl implements CommentService {
     } catch (Exception e) {
       log.error("Error occurred while fetching data from Redis for commentTreeId: {}", commentTreeId, e);
     }
-    return null;
+    return Collections.emptyMap();
   }
 
   private Map<String, Object> fetchAndCacheCommentTreeMap(String commentTreeId) {
     Optional<CommentTree> optionalCommentTree = commentTreeRepository.findById(commentTreeId);
     if (!optionalCommentTree.isPresent()) {
-      return null;
+      return Collections.emptyMap();
     }
     log.info("CommentTreeService::getCommentTree:fetching from postgres");
     Map<String, Object> commentResultMap = objectMapper.convertValue(

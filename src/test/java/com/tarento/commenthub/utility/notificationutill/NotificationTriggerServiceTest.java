@@ -12,6 +12,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.*;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
@@ -53,14 +54,14 @@ class NotificationTriggerServiceTest {
         message.put("title", "Test Title");
 
         when(serverConfig.getNotificationApiUrl()).thenReturn("http://notification-api.com");
-        
-        ResponseEntity<Map> successResponse = new ResponseEntity<>(new HashMap<>(), HttpStatus.OK);
-        when(restTemplate.postForEntity(anyString(), any(HttpEntity.class), eq(Map.class)))
+
+        ResponseEntity<Map<String, Object>> successResponse = new ResponseEntity<>(new HashMap<>(), HttpStatus.OK);
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(HttpEntity.class), any(ParameterizedTypeReference.class)))
                 .thenReturn(successResponse);
 
         assertDoesNotThrow(() -> notificationTriggerService.sendNotification(subCategory, subType, userIds, message));
 
-        verify(restTemplate).postForEntity(eq("http://notification-api.com"), any(HttpEntity.class), eq(Map.class));
+        verify(restTemplate).exchange(eq("http://notification-api.com"), eq(HttpMethod.POST), any(HttpEntity.class), any(ParameterizedTypeReference.class));
     }
 
     @ParameterizedTest
@@ -79,7 +80,7 @@ class NotificationTriggerServiceTest {
 
         assertDoesNotThrow(() -> notificationTriggerService.sendNotification(subCategory, subType, userIds, message));
 
-        verify(restTemplate, never()).postForEntity(anyString(), any(HttpEntity.class), eq(Map.class));
+        verify(restTemplate, never()).exchange(anyString(), any(HttpMethod.class), any(HttpEntity.class), any(ParameterizedTypeReference.class));
     }
 
     @Test
@@ -92,7 +93,7 @@ class NotificationTriggerServiceTest {
 
         assertDoesNotThrow(() -> notificationTriggerService.sendNotification(subCategory, subType, userIds, message));
 
-        verify(restTemplate, never()).postForEntity(anyString(), any(HttpEntity.class), eq(Map.class));
+        verify(restTemplate, never()).exchange(anyString(), any(HttpMethod.class), any(HttpEntity.class), any(ParameterizedTypeReference.class));
     }
 
     @Test
@@ -105,7 +106,7 @@ class NotificationTriggerServiceTest {
 
         assertDoesNotThrow(() -> notificationTriggerService.sendNotification(subCategory, subType, userIds, message));
 
-        verify(restTemplate, never()).postForEntity(anyString(), any(HttpEntity.class), eq(Map.class));
+        verify(restTemplate, never()).exchange(anyString(), any(HttpMethod.class), any(HttpEntity.class), any(ParameterizedTypeReference.class));
     }
 
     @Test
@@ -117,7 +118,7 @@ class NotificationTriggerServiceTest {
 
         assertDoesNotThrow(() -> notificationTriggerService.sendNotification(subCategory, subType, userIds, message));
 
-        verify(restTemplate, never()).postForEntity(anyString(), any(HttpEntity.class), eq(Map.class));
+        verify(restTemplate, never()).exchange(anyString(), any(HttpMethod.class), any(HttpEntity.class), any(ParameterizedTypeReference.class));
     }
 
     @Test
@@ -129,7 +130,7 @@ class NotificationTriggerServiceTest {
 
         assertDoesNotThrow(() -> notificationTriggerService.sendNotification(subCategory, subType, userIds, message));
 
-        verify(restTemplate, never()).postForEntity(anyString(), any(HttpEntity.class), eq(Map.class));
+        verify(restTemplate, never()).exchange(anyString(), any(HttpMethod.class), any(HttpEntity.class), any(ParameterizedTypeReference.class));
     }
 
     @Test
@@ -143,12 +144,12 @@ class NotificationTriggerServiceTest {
         when(serverConfig.getNotificationApiUrl()).thenReturn("http://notification-api.com");
         
         HttpClientErrorException exception = new HttpClientErrorException(HttpStatus.BAD_REQUEST, "Bad Request", "Error response".getBytes(), null);
-        when(restTemplate.postForEntity(anyString(), any(HttpEntity.class), eq(Map.class)))
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(HttpEntity.class), any(ParameterizedTypeReference.class)))
                 .thenThrow(exception);
 
         assertDoesNotThrow(() -> notificationTriggerService.sendNotification(subCategory, subType, userIds, message));
 
-        verify(restTemplate).postForEntity(eq("http://notification-api.com"), any(HttpEntity.class), eq(Map.class));
+        verify(restTemplate).exchange(eq("http://notification-api.com"), eq(HttpMethod.POST), any(HttpEntity.class), any(ParameterizedTypeReference.class));
     }
 
     @Test
@@ -161,12 +162,12 @@ class NotificationTriggerServiceTest {
 
         when(serverConfig.getNotificationApiUrl()).thenReturn("http://notification-api.com");
         
-        when(restTemplate.postForEntity(anyString(), any(HttpEntity.class), eq(Map.class)))
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(HttpEntity.class), any(ParameterizedTypeReference.class)))
                 .thenThrow(new RuntimeException("Unexpected error"));
 
         assertDoesNotThrow(() -> notificationTriggerService.sendNotification(subCategory, subType, userIds, message));
 
-        verify(restTemplate).postForEntity(eq("http://notification-api.com"), any(HttpEntity.class), eq(Map.class));
+        verify(restTemplate).exchange(eq("http://notification-api.com"), eq(HttpMethod.POST), any(HttpEntity.class), any(ParameterizedTypeReference.class));
     }
 
     @Test
@@ -179,13 +180,13 @@ class NotificationTriggerServiceTest {
 
         when(serverConfig.getNotificationApiUrl()).thenReturn("http://notification-api.com");
         
-        ResponseEntity<Map> errorResponse = new ResponseEntity<>(new HashMap<>(), HttpStatus.INTERNAL_SERVER_ERROR);
-        when(restTemplate.postForEntity(anyString(), any(HttpEntity.class), eq(Map.class)))
+        ResponseEntity<Map<String, Object>> errorResponse = new ResponseEntity<>(new HashMap<>(), HttpStatus.INTERNAL_SERVER_ERROR);
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(HttpEntity.class), any(ParameterizedTypeReference.class)))
                 .thenReturn(errorResponse);
 
         assertDoesNotThrow(() -> notificationTriggerService.sendNotification(subCategory, subType, userIds, message));
 
-        verify(restTemplate).postForEntity(eq("http://notification-api.com"), any(HttpEntity.class), eq(Map.class));
+        verify(restTemplate).exchange(eq("http://notification-api.com"), eq(HttpMethod.POST), any(HttpEntity.class), any(ParameterizedTypeReference.class));
     }
 
     @Test
@@ -205,14 +206,14 @@ class NotificationTriggerServiceTest {
         when(objectMapper.createObjectNode()).thenReturn(mockPlaceholders);
         when(serverConfig.getNotificationApiUrl()).thenReturn("http://notification-api.com");
         
-        ResponseEntity<Map> successResponse = new ResponseEntity<>(new HashMap<>(), HttpStatus.OK);
-        when(restTemplate.postForEntity(anyString(), any(HttpEntity.class), eq(Map.class)))
+        ResponseEntity<Map<String, Object>> successResponse = new ResponseEntity<>(new HashMap<>(), HttpStatus.OK);
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(HttpEntity.class), any(ParameterizedTypeReference.class)))
                 .thenReturn(successResponse);
 
         assertDoesNotThrow(() -> notificationTriggerService.triggerNotification(subCategory, subType, userIds, userName, title, data));
 
         verify(objectMapper).createObjectNode();
-        verify(restTemplate).postForEntity(eq("http://notification-api.com"), any(HttpEntity.class), eq(Map.class));
+        verify(restTemplate).exchange(eq("http://notification-api.com"), eq(HttpMethod.POST), any(HttpEntity.class), any(ParameterizedTypeReference.class));
     }
 
     @Test
@@ -231,13 +232,13 @@ class NotificationTriggerServiceTest {
         when(objectMapper.createObjectNode()).thenReturn(mockPlaceholders);
         when(serverConfig.getNotificationApiUrl()).thenReturn("http://notification-api.com");
         
-        when(restTemplate.postForEntity(anyString(), any(HttpEntity.class), eq(Map.class)))
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(HttpEntity.class), any(ParameterizedTypeReference.class)))
                 .thenThrow(new RuntimeException("Network error"));
 
         assertDoesNotThrow(() -> notificationTriggerService.triggerNotification(subCategory, subType, userIds, userName, title, data));
 
         verify(objectMapper).createObjectNode();
-        verify(restTemplate).postForEntity(eq("http://notification-api.com"), any(HttpEntity.class), eq(Map.class));
+        verify(restTemplate).exchange(eq("http://notification-api.com"), eq(HttpMethod.POST), any(HttpEntity.class), any(ParameterizedTypeReference.class));
     }
 
     @Test
@@ -258,7 +259,7 @@ class NotificationTriggerServiceTest {
         assertDoesNotThrow(() -> notificationTriggerService.triggerNotification(subCategory, subType, userIds, userName, title, data));
 
         verify(objectMapper).createObjectNode();
-        verify(restTemplate, never()).postForEntity(anyString(), any(HttpEntity.class), eq(Map.class));
+        verify(restTemplate, never()).exchange(anyString(), any(HttpMethod.class), any(HttpEntity.class), any(ParameterizedTypeReference.class));
     }
 
     @Test
@@ -277,13 +278,13 @@ class NotificationTriggerServiceTest {
         when(objectMapper.createObjectNode()).thenReturn(mockPlaceholders);
         when(serverConfig.getNotificationApiUrl()).thenReturn("http://notification-api.com");
         
-        ResponseEntity<Map> successResponse = new ResponseEntity<>(new HashMap<>(), HttpStatus.OK);
-        when(restTemplate.postForEntity(anyString(), any(HttpEntity.class), eq(Map.class)))
+        ResponseEntity<Map<String, Object>> successResponse = new ResponseEntity<>(new HashMap<>(), HttpStatus.OK);
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(HttpEntity.class), any(ParameterizedTypeReference.class)))
                 .thenReturn(successResponse);
 
         assertDoesNotThrow(() -> notificationTriggerService.triggerNotification(subCategory, subType, userIds, userName, title, data));
 
         verify(objectMapper).createObjectNode();
-        verify(restTemplate).postForEntity(eq("http://notification-api.com"), any(HttpEntity.class), eq(Map.class));
+        verify(restTemplate).exchange(eq("http://notification-api.com"), eq(HttpMethod.POST), any(HttpEntity.class), any(ParameterizedTypeReference.class));
     }
 }

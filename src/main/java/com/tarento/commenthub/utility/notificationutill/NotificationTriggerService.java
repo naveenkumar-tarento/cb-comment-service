@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.tarento.commenthub.utility.CbServerProperties;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.MapUtils;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
@@ -67,8 +68,9 @@ public class NotificationTriggerService {
             headers.setContentType(MediaType.APPLICATION_JSON);
             HttpEntity<Map<String, Object>> request = new HttpEntity<>(payload, headers);
 
-            ResponseEntity<Map> serviceResponse = restTemplate.postForEntity(serverConfig.getNotificationApiUrl()
-                    , request, Map.class);
+            ResponseEntity<Map<String, Object>> serviceResponse = restTemplate.exchange(
+                    serverConfig.getNotificationApiUrl(), HttpMethod.POST, request,
+                    new ParameterizedTypeReference<Map<String, Object>>() {});
             if (serviceResponse.getStatusCode().is2xxSuccessful()) {
                 log.info("NotificationTriggerService::sendNotification success");
             } else {
