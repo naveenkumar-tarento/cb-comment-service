@@ -3,6 +3,7 @@ package com.tarento.commenthub.authentication.util;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tarento.commenthub.authentication.model.KeyData;
 import com.tarento.commenthub.constant.Constants;
+import com.tarento.commenthub.transactional.utils.PropertiesCache;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.keycloak.common.util.Time;
@@ -45,10 +46,10 @@ class AccessTokenValidatorTest {
 
     @BeforeEach
     void setUp() throws Exception {
-        accessTokenValidator = new AccessTokenValidator(keyManager);
-        spyAccessTokenValidator = spy(new AccessTokenValidator(keyManager));
+        PropertiesCache propertiesCache = new PropertiesCache();
+        accessTokenValidator = new AccessTokenValidator(keyManager, propertiesCache);
+        spyAccessTokenValidator = spy(new AccessTokenValidator(keyManager, propertiesCache));
 
-        // Mock PropertiesCache.getInstance().getProperty(...) if needed
         // Generate tokens for different scenarios
         expiredToken = generateToken("expiredUserId", Time.currentTime() - 1000, "expectedIssuer");
         invalidSignatureToken = generateToken("invalidSignatureUserId", Time.currentTime() + 1000, "expectedIssuer");
@@ -182,9 +183,9 @@ class AccessTokenValidatorTest {
     @Test
     void testCheckIss_validIssuer() throws Exception {
         // Arrange
-        Field realmUrlField = AccessTokenValidator.class.getDeclaredField("REALM_URL");
+        Field realmUrlField = AccessTokenValidator.class.getDeclaredField("realmUrl");
         realmUrlField.setAccessible(true);
-        String validIssuer = (String) realmUrlField.get(null);
+        String validIssuer = (String) realmUrlField.get(accessTokenValidator);
 
         Map<String, Object> payload = new HashMap<>();
         payload.put("iss", validIssuer);
@@ -215,9 +216,9 @@ class AccessTokenValidatorTest {
 
     @Test
     void testVerifyUserToken_validSignature_expiredExp_returnsUnauthorized() throws Exception {
-        Field realmUrlField = AccessTokenValidator.class.getDeclaredField("REALM_URL");
+        Field realmUrlField = AccessTokenValidator.class.getDeclaredField("realmUrl");
         realmUrlField.setAccessible(true);
-        String validIssuer = (String) realmUrlField.get(null);
+        String validIssuer = (String) realmUrlField.get(accessTokenValidator);
 
         Map<String, Object> payload = new HashMap<>();
         payload.put("iss", validIssuer);
@@ -267,9 +268,9 @@ class AccessTokenValidatorTest {
 
     @Test
     void testVerifyUserToken_exceptionDuringPayloadProcessing_returnsUnauthorized() throws Exception {
-        Field realmUrlField = AccessTokenValidator.class.getDeclaredField("REALM_URL");
+        Field realmUrlField = AccessTokenValidator.class.getDeclaredField("realmUrl");
         realmUrlField.setAccessible(true);
-        String validIssuer = (String) realmUrlField.get(null);
+        String validIssuer = (String) realmUrlField.get(accessTokenValidator);
 
         Map<String, Object> payload = new HashMap<>();
         payload.put("iss", validIssuer);

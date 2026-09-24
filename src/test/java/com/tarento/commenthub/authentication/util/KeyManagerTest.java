@@ -78,11 +78,7 @@ class KeyManagerTest {
 
         // Mock the Files.walk method
         try (MockedStatic<Files> filesMock = Mockito.mockStatic(Files.class);
-             MockedStatic<Paths> pathsMock = Mockito.mockStatic(Paths.class);
-             MockedStatic<PropertiesCache> propertiesCacheMock = Mockito.mockStatic(PropertiesCache.class)) {
-
-            // Mock PropertiesCache.getInstance
-            propertiesCacheMock.when(PropertiesCache::getInstance).thenReturn(propertiesCache);
+             MockedStatic<Paths> pathsMock = Mockito.mockStatic(Paths.class)) {
 
             // Mock Paths.get to return our mock path
             Path basePath = mock(Path.class);
@@ -125,24 +121,20 @@ class KeyManagerTest {
         
         // Mock the Files.walk method
         try (MockedStatic<Files> filesMock = Mockito.mockStatic(Files.class);
-             MockedStatic<Paths> pathsMock = Mockito.mockStatic(Paths.class);
-             MockedStatic<PropertiesCache> propertiesCacheMock = Mockito.mockStatic(PropertiesCache.class)) {
-            
-            // Mock PropertiesCache.getInstance
-            propertiesCacheMock.when(PropertiesCache::getInstance).thenReturn(propertiesCache);
-            
+             MockedStatic<Paths> pathsMock = Mockito.mockStatic(Paths.class)) {
+
             // Mock Paths.get to return our mock path
             Path basePath = mock(Path.class);
             pathsMock.when(() -> Paths.get(TEST_BASE_PATH)).thenReturn(basePath);
             pathsMock.when(() -> Paths.get(anyString())).thenReturn(mockKeyPath);
-            
+
             // Mock Files.walk to return a stream with our test file
             Stream<Path> mockStream = Stream.of(mockKeyPath);
             filesMock.when(() -> Files.walk(basePath)).thenReturn(mockStream);
-            
+
             // Mock Files.isRegularFile to return true for our test path
             filesMock.when(() -> Files.isRegularFile(mockKeyPath)).thenReturn(true);
-            
+
             // Mock Files.readAllLines to throw an exception
             filesMock.when(() -> Files.readAllLines(mockKeyPath, StandardCharsets.UTF_8))
                 .thenThrow(new IOException("Test exception"));
@@ -159,12 +151,8 @@ class KeyManagerTest {
     void testInit_ExceptionDuringWalk() {
         // Mock the Files.walk method to throw an exception
         try (MockedStatic<Files> filesMock = Mockito.mockStatic(Files.class);
-             MockedStatic<Paths> pathsMock = Mockito.mockStatic(Paths.class);
-             MockedStatic<PropertiesCache> propertiesCacheMock = Mockito.mockStatic(PropertiesCache.class)) {
-            
-            // Mock PropertiesCache.getInstance
-            propertiesCacheMock.when(PropertiesCache::getInstance).thenReturn(propertiesCache);
-            
+             MockedStatic<Paths> pathsMock = Mockito.mockStatic(Paths.class)) {
+
             // Mock Paths.get to return a mock path
             Path basePath = mock(Path.class);
             pathsMock.when(() -> Paths.get(TEST_BASE_PATH)).thenReturn(basePath);

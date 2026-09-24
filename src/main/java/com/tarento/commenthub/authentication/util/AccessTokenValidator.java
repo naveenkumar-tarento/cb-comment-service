@@ -17,16 +17,16 @@ import org.springframework.stereotype.Component;
 public class AccessTokenValidator {
 
   private final KeyManager keyManager;
+  private final String realmUrl;
 
-  public AccessTokenValidator(KeyManager keyManager) {
+  public AccessTokenValidator(KeyManager keyManager, PropertiesCache propertiesCache) {
     this.keyManager = keyManager;
+    this.realmUrl = propertiesCache.getProperty(Constants.SSO_URL) + "realms/"
+        + propertiesCache.getProperty(Constants.SSO_REALM);
   }
 
   private static Logger logger = LoggerFactory.getLogger(AccessTokenValidator.class.getName());
   private static final ObjectMapper mapper = new ObjectMapper();
-  private static PropertiesCache cache = PropertiesCache.getInstance();
-  private static final String REALM_URL =
-      cache.getProperty(Constants.SSO_URL) + "realms/" + cache.getProperty(Constants.SSO_REALM);
 
 
   /**
@@ -114,9 +114,9 @@ public class AccessTokenValidator {
    */
   private boolean checkIss(String iss) {
     // Check if the realm URL is blank or if the issuer does not match the realm URL
-    if (StringUtils.isBlank(REALM_URL) || !REALM_URL.equalsIgnoreCase(iss)) {
+    if (StringUtils.isBlank(realmUrl) || !realmUrl.equalsIgnoreCase(iss)) {
       logger.warn("Issuer does not match the expected realm URL. Issuer: {}, Expected: {}", iss,
-          REALM_URL);
+          realmUrl);
       return false;
     }
     logger.info("Issuer validation successful. Issuer: {}", iss);

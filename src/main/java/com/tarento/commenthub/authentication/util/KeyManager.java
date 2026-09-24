@@ -26,9 +26,13 @@ import org.springframework.stereotype.Component;
 public class KeyManager {
 
   private static final Logger logger = LoggerFactory.getLogger(KeyManager.class.getName());
-  private static final PropertiesCache propertiesCache = PropertiesCache.getInstance();
+  private final PropertiesCache propertiesCache;
 
   private static final Map<String, KeyData> keyMap = new HashMap<>();
+
+  public KeyManager(PropertiesCache propertiesCache) {
+    this.propertiesCache = propertiesCache;
+  }
 
   @PostConstruct
   public void init() {

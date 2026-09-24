@@ -1014,53 +1014,6 @@ public class CommentServiceImpl implements CommentService {
     return jwtToken;
   }
 
-  private List<Map<String, Object>> fetchUsersByCommentData (List<Comment> comments) {
-    List<String> userIds = comments.stream()
-        .map(comment -> comment.getCommentData().get(Constants.COMMENT_SOURCE)
-            .get(Constants.USER_ID).asText())
-        .toList();
-    Map<String, Object> propertyMap = new HashMap<>();
-    propertyMap.put(Constants.ID, userIds);
-    List<Map<String, Object>> userInfoList = cassandraOperation.getRecordsByPropertiesWithoutFiltering(
-        Constants.KEYSPACE_SUNBIRD, Constants.TABLE_USER, propertyMap,
-        Arrays.asList(Constants.PROFILE_DETAILS, Constants.FIRST_NAME, Constants.ID), null);
-
-    return userInfoList.stream()
-        .map(userInfo -> {
-          Map<String, Object> userMap = new HashMap<>();
-
-          // Extract user ID and user name
-          String userId = (String) userInfo.get(Constants.ID);
-          String userName = (String) userInfo.get(Constants.FIRST_NAME);
-
-          userMap.put(Constants.USER_ID, userId);
-          userMap.put(Constants.USER_NAME, userName);
-
-          // Process profile details if present
-          String profileDetails = (String) userInfo.get(Constants.PROFILE_DETAILS);
-          if (StringUtils.isNotBlank(profileDetails)) {
-            try {
-              // Convert JSON profile details to a Map
-              Map<String, Object> profileDetailsMap = objectMapper.readValue(profileDetails,
-                  new TypeReference<HashMap<String, Object>>() {});
-
-              // Check for profile image and add to userMap if available
-              if (MapUtils.isNotEmpty(profileDetailsMap) && profileDetailsMap.containsKey(Constants.PROFILE_IMG)) {
-                String profileImageUrl = (String) profileDetailsMap.get(Constants.PROFILE_IMG);
-                if (StringUtils.isNotEmpty(profileImageUrl)) {
-                  userMap.put(Constants.PROFILE_IMG, profileImageUrl);
-                }
-              }
-            } catch (JsonProcessingException e) {
-              throw new UncheckedIOException(e);
-            }
-          }
-
-          return userMap;
-        })
-        .toList();
-  }
-
   public String generateRedisJwtTokenKey(String commentTreeId, Integer offset, Integer limit) {
       try {
         return JWT.create()

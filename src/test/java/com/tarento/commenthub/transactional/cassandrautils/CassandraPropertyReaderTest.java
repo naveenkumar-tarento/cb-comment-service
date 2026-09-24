@@ -8,18 +8,10 @@ import java.util.Properties;
 import static org.junit.jupiter.api.Assertions.*;
 
 class CassandraPropertyReaderTest {
-    @Test
-    void testSingletonReturnsSameInstance() {
-        CassandraPropertyReader instance1 = CassandraPropertyReader.getInstance();
-        CassandraPropertyReader instance2 = CassandraPropertyReader.getInstance();
-
-        assertNotNull(instance1);
-        assertSame(instance1, instance2, "getInstance should always return same object");
-    }
 
     @Test
     void testReadPropertyReturnsValueIfPresent() throws Exception {
-        CassandraPropertyReader reader = CassandraPropertyReader.getInstance();
+        CassandraPropertyReader reader = new CassandraPropertyReader();
 
         // Inject custom properties via reflection
         Field propsField = CassandraPropertyReader.class.getDeclaredField("properties");
@@ -33,7 +25,7 @@ class CassandraPropertyReaderTest {
 
     @Test
     void testReadPropertyReturnsKeyIfNotFound() {
-        CassandraPropertyReader reader = CassandraPropertyReader.getInstance();
+        CassandraPropertyReader reader = new CassandraPropertyReader();
         assertEquals("unknownKey", reader.readProperty("unknownKey"));
     }
 

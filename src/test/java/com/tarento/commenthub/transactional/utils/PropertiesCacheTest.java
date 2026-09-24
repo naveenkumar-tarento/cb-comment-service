@@ -13,7 +13,7 @@ class PropertiesCacheTest {
 
     @BeforeEach
     void setUp() throws Exception {
-        propertiesCache = PropertiesCache.getInstance();
+        propertiesCache = new PropertiesCache();
 
         // Inject fake properties into configProp using reflection
         Field field = PropertiesCache.class.getDeclaredField("configProp");
@@ -21,15 +21,6 @@ class PropertiesCacheTest {
         Properties props = (Properties) field.get(propertiesCache);
         props.clear();
         props.setProperty("myKey", "myValue");
-    }
-
-    @Test
-    void testGetInstanceReturnsSingleton() {
-        PropertiesCache first = PropertiesCache.getInstance();
-        PropertiesCache second = PropertiesCache.getInstance();
-
-        assertNotNull(first);
-        assertSame(first, second, "Should return same singleton instance");
     }
 
     @Test

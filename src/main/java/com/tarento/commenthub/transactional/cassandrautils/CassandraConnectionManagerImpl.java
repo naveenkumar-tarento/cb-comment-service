@@ -48,6 +48,8 @@ public class CassandraConnectionManagerImpl implements CassandraConnectionManage
     private static final Map<String, CqlSession> cassandraSessionMap = new ConcurrentHashMap<>(2);
     private static CqlSession session;
 
+    private final PropertiesCache propertiesCache;
+
     @Override
     public CqlSession getSession(String keyspaceName) {
         // Check if session for keyspace already exists
@@ -62,13 +64,14 @@ public class CassandraConnectionManagerImpl implements CassandraConnectionManage
         }
     }
 
-    public CassandraConnectionManagerImpl() {
+    public CassandraConnectionManagerImpl(PropertiesCache propertiesCache) {
+        this.propertiesCache = propertiesCache;
         // Initialize the connection and register shutdown hook
         registerShutDownHook();
         createCassandraConnection();
     }
 
-    private static void createCassandraConnection() {
+    private void createCassandraConnection() {
         try {
             session = createCassandraConnectionWithKeySpaces(null);
         } catch (Exception e) {
@@ -80,11 +83,10 @@ public class CassandraConnectionManagerImpl implements CassandraConnectionManage
         }
     }
 
-    private static CqlSession createCassandraConnectionWithKeySpaces(String keySpaceName) {
+    private CqlSession createCassandraConnectionWithKeySpaces(String keySpaceName) {
         try {
             // Load the properties required for connection
-            PropertiesCache cache = PropertiesCache.getInstance();
-            String cassandraHost = cache.getProperty(Constants.CASSANDRA_CONFIG_HOST);
+            String cassandraHost = propertiesCache.getProperty(Constants.CASSANDRA_CONFIG_HOST);
             if (StringUtils.isBlank(cassandraHost)) {
                 throw new CustomException(
                     Constants.ERROR,
@@ -103,11 +105,11 @@ public class CassandraConnectionManagerImpl implements CassandraConnectionManage
                 .withString(DefaultDriverOption.REQUEST_CONSISTENCY, getConsistencyLevel().name())
                 .withString(DefaultDriverOption.LOAD_BALANCING_LOCAL_DATACENTER, DATACENTER_1)
                 .withInt(DefaultDriverOption.CONNECTION_POOL_LOCAL_SIZE,
-                    Integer.parseInt(cache.getProperty(Constants.CORE_CONNECTIONS_PER_HOST_FOR_LOCAL)))
+                    Integer.parseInt(propertiesCache.getProperty(Constants.CORE_CONNECTIONS_PER_HOST_FOR_LOCAL)))
                 .withInt(DefaultDriverOption.CONNECTION_POOL_REMOTE_SIZE,
-                    Integer.parseInt(cache.getProperty(Constants.CORE_CONNECTIONS_PER_HOST_FOR_REMOTE)))
+                    Integer.parseInt(propertiesCache.getProperty(Constants.CORE_CONNECTIONS_PER_HOST_FOR_REMOTE)))
                 .withInt(DefaultDriverOption.HEARTBEAT_INTERVAL,
-                    Integer.parseInt(cache.getProperty(Constants.HEARTBEAT_INTERVAL)))
+                    Integer.parseInt(propertiesCache.getProperty(Constants.HEARTBEAT_INTERVAL)))
                 .withInt(DefaultDriverOption.CONNECTION_INIT_QUERY_TIMEOUT, 10000)
                 .withInt(DefaultDriverOption.REQUEST_TIMEOUT, 10000)
                 .withString(DefaultDriverOption.PROTOCOL_VERSION, ProtocolVersion.V4.toString())
@@ -147,8 +149,8 @@ public class CassandraConnectionManagerImpl implements CassandraConnectionManage
         }
     }
 
-    private static ConsistencyLevel getConsistencyLevel() {
-        String consistency = PropertiesCache.getInstance().readProperty(Constants.SUNBIRD_CASSANDRA_CONSISTENCY_LEVEL);
+    private ConsistencyLevel getConsistencyLevel() {
+        String consistency = propertiesCache.readProperty(Constants.SUNBIRD_CASSANDRA_CONSISTENCY_LEVEL);
 
         log.info("CassandraConnectionManagerImpl:getConsistencyLevel: level = " + consistency);
 

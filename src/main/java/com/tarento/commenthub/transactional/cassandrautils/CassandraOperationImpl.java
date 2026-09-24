@@ -29,9 +29,11 @@ public class CassandraOperationImpl implements CassandraOperation {
     private final Logger logger = LoggerFactory.getLogger(getClass().getName());
 
     private final CassandraConnectionManager connectionManager;
+    private final CassandraUtil cassandraUtil;
 
-    public CassandraOperationImpl(CassandraConnectionManager connectionManager) {
+    public CassandraOperationImpl(CassandraConnectionManager connectionManager, CassandraUtil cassandraUtil) {
         this.connectionManager = connectionManager;
+        this.cassandraUtil = cassandraUtil;
     }
 
     private Select processQuery(String keyspaceName, String tableName, Map<String, Object> propertyMap,
@@ -72,7 +74,7 @@ public class CassandraOperationImpl implements CassandraOperation {
             selectQuery = processQuery(keyspaceName, tableName, propertyMap, fields);
             CqlSession session = connectionManager.getSession(keyspaceName);
             ResultSet results = session.execute(selectQuery.build());
-            response = CassandraUtil.createResponse(results);
+            response = cassandraUtil.createResponse(results);
             logger.info("{}", response);
 
         } catch (Exception e) {
@@ -85,7 +87,7 @@ public class CassandraOperationImpl implements CassandraOperation {
     public Object insertRecord(String keyspaceName, String tableName, Map<String, Object> request) {
         ApiResponse response = new ApiResponse();
         try {
-            String query = CassandraUtil.getPreparedStatement(keyspaceName, tableName, request);
+            String query = cassandraUtil.getPreparedStatement(keyspaceName, tableName, request);
             CqlSession session = connectionManager.getSession(keyspaceName);
             com.datastax.oss.driver.api.core.cql.PreparedStatement statement = session.prepare(query);
             com.datastax.oss.driver.api.core.cql.BoundStatement boundStatement = statement.bind(request.values().toArray());
@@ -100,34 +102,6 @@ public class CassandraOperationImpl implements CassandraOperation {
         return response;
     }
 
-    private Select processQueryWithoutFiltering(String keyspaceName, String tableName, Map<String, Object> propertyMap,
-        List<String> fields) {
-        Select selectQuery;
-        if (CollectionUtils.isNotEmpty(fields)) {
-            selectQuery = QueryBuilder.selectFrom(keyspaceName, tableName).columns(fields);
-        } else {
-            selectQuery = QueryBuilder.selectFrom(keyspaceName, tableName).all();
-        }
-        if (MapUtils.isNotEmpty(propertyMap)) {
-            for (Map.Entry<String, Object> entry : propertyMap.entrySet()) {
-                String columnName = entry.getKey();
-                Object value = entry.getValue();
-                if (value instanceof List) {
-                    List<?> valueList = (List<?>) value;
-                    if (CollectionUtils.isNotEmpty(valueList)) {
-                        List<Term> terms = valueList.stream()
-                            .map(QueryBuilder::literal)
-                            .collect(Collectors.toList());
-                        selectQuery = selectQuery.whereColumn(columnName).in(terms);
-                    }
-                } else {
-                    selectQuery = selectQuery.whereColumn(columnName).isEqualTo(QueryBuilder.literal(value));
-                }
-            }
-        }
-        return selectQuery;
-    }
-
     @Override
     public List<Map<String, Object>> getRecordsByPropertiesWithoutFiltering(String keyspaceName, String tableName, Map<String, Object> propertyMap, List<String> fields, Integer limit) {
         List<Map<String, Object>> response = new ArrayList<>();
@@ -139,7 +113,7 @@ public class CassandraOperationImpl implements CassandraOperation {
             String queryString = selectQuery.toString();
             SimpleStatement statement = SimpleStatement.newInstance(queryString);
             ResultSet results = connectionManager.getSession(keyspaceName).execute(statement);
-            response = CassandraUtil.createResponse(results);
+            response = cassandraUtil.createResponse(results);
 
         } catch (Exception e) {
             logger.error("Error fetching records from {}: {}", tableName, e.getMessage());
