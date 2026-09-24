@@ -302,7 +302,7 @@ class CommentServiceImplPaginatedCommentV3Test {
         when(commentTreeRepository.findById("tree123")).thenReturn(Optional.of(tree));
 
         Map<String, Object> commentResultMap = createMockCommentTreeData();
-        when(objectMapper.convertValue(eq(treeData), eq(Map.class))).thenReturn(commentResultMap);
+        when(objectMapper.convertValue(treeData, Map.class)).thenReturn(commentResultMap);
         when(objectMapper.writeValueAsString(commentResultMap))
                 .thenThrow(new com.fasterxml.jackson.core.JsonProcessingException("boom") {});
 
