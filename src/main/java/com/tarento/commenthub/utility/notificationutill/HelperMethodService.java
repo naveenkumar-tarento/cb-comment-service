@@ -12,9 +12,9 @@ import com.tarento.commenthub.constant.Constants;
 import com.tarento.commenthub.service.ContentService;
 import com.tarento.commenthub.transactional.cassandrautils.CassandraOperation;
 import com.tarento.commenthub.utility.RedisCacheMngr;
-import com.tarento.commenthub.utility.UserProfileMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
@@ -69,8 +69,51 @@ public class HelperMethodService {
     }
 
     private Map<String, Object> toUserMap(Map<String, Object> userInfo) {
-        return UserProfileMapper.toUserMap(userInfo, objectMapper,
-                e -> log.error("Error occurred while converting json object to json string", e));
+        Map<String, Object> userMap = new HashMap<>();
+
+        // Extract user ID and user name
+        String userId = (String) userInfo.get(Constants.ID);
+        String userName = (String) userInfo.get(Constants.FIRST_NAME);
+
+        userMap.put(Constants.USER_ID_KEY, userId);
+        userMap.put(Constants.FIRST_NAME_KEY, userName);
+
+        // Process profile details if present
+        String profileDetails = (String) userInfo.get(Constants.PROFILE_DETAILS);
+        if (StringUtils.isNotBlank(profileDetails)) {
+            applyProfileDetails(userMap, profileDetails);
+        }
+
+        return userMap;
+    }
+
+    private void applyProfileDetails(Map<String, Object> userMap, String profileDetails) {
+        Map<String, Object> profileDetailsMap;
+        try {
+            // Convert JSON profile details to a Map
+            profileDetailsMap = objectMapper.readValue(profileDetails,
+                    new TypeReference<HashMap<String, Object>>() {
+                    });
+        } catch (JsonProcessingException e) {
+            log.error("Error occurred while converting json object to json string", e);
+            return;
+        }
+
+        // Check for profile image and add to userMap if available
+        if (MapUtils.isEmpty(profileDetailsMap)) {
+            return;
+        }
+        if (profileDetailsMap.containsKey(Constants.PROFILE_IMG) && StringUtils.isNotBlank((String) profileDetailsMap.get(Constants.PROFILE_IMG))) {
+            userMap.put(Constants.PROFILE_IMG_KEY, profileDetailsMap.get(Constants.PROFILE_IMG));
+        }
+        if (profileDetailsMap.containsKey(Constants.DESIGNATION_KEY) && StringUtils.isNotEmpty((String) profileDetailsMap.get(Constants.DESIGNATION_KEY))) {
+            userMap.put(Constants.DESIGNATION_KEY, profileDetailsMap.get(Constants.PROFILE_IMG));
+        }
+        if (profileDetailsMap.containsKey(Constants.EMPLOYMENT_DETAILS) && MapUtils.isNotEmpty(
+                (Map<?, ?>) profileDetailsMap.get(Constants.EMPLOYMENT_DETAILS)) && ((Map<?, ?>) profileDetailsMap.get(Constants.EMPLOYMENT_DETAILS)).containsKey(Constants.DEPARTMENT_KEY) && StringUtils.isNotBlank(
+                (String) ((Map<?, ?>) profileDetailsMap.get(Constants.EMPLOYMENT_DETAILS)).get(Constants.DEPARTMENT_KEY))) {
+            userMap.put(Constants.DEPARTMENT, ((Map<?, ?>) profileDetailsMap.get(Constants.EMPLOYMENT_DETAILS)).get(Constants.DEPARTMENT_KEY));
+        }
     }
 
     public String fetchUserFirstName(String userId) {
