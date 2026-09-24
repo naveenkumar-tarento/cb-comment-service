@@ -769,6 +769,34 @@ class CommentServiceImplTest {
     }
 
     @Test
+    void testLikeCommentWithExistingRecord_addsNewCommentId() {
+        // A like record already exists for this user/course, but for a different commentId,
+        // so likeComment("c1") should append "c1" to the existing list rather than removing it.
+        Map<String, Object> likePayload = validPayload();
+
+        ObjectNode commentData = objectMapper.createObjectNode();
+        commentData.put(Constants.LIKE, 0);
+
+        Comment comment = new Comment();
+        comment.setCommentData(commentData);
+
+        List<String> liked = new ArrayList<>();
+        liked.add("c2");
+        UserCourseCommentLike like = new UserCourseCommentLike();
+        like.setCommentIds(liked);
+
+        when(commentRepository.findById("c1")).thenReturn(Optional.of(comment));
+        when(userCommentLikeRepository.findById(any())).thenReturn(Optional.of(like));
+        when(commentRepository.save(any())).thenReturn(comment);
+
+        ApiResponse response = commentService.likeComment(likePayload);
+
+        assertEquals(HttpStatus.OK, response.getResponseCode());
+        assertTrue(liked.contains("c1"));
+        assertTrue(liked.contains("c2"));
+    }
+
+    @Test
     void testLikeCommentWithNewLike() {
         Map<String, Object> likePayload = validPayload();
 
@@ -854,6 +882,19 @@ class CommentServiceImplTest {
     }
 
     @Test
+    void testPaginatedComment_invalidSearchPayload_returnsBadRequest() {
+        SearchCriteria criteria = new SearchCriteria();
+        criteria.setCommentTreeId("");
+        criteria.setEntityType("");
+        criteria.setWorkflow("");
+
+        ApiResponse response = commentService.paginatedComment(criteria, "v1");
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getResponseCode());
+        assertTrue(response.getParams().getErr().contains(Constants.COMMENT_TREE_ID));
+    }
+
+    @Test
     void testPaginatedComment_withMissingTree_shouldReturnNotFound() {
         SearchCriteria criteria = new SearchCriteria();
         criteria.setCommentTreeId("tree-id");
@@ -888,6 +929,53 @@ class CommentServiceImplTest {
 
         assertEquals(HttpStatus.OK, response.getResponseCode());
         assertEquals("cachedValue", ((Map<?, ?>) response.getResult()).get("cachedKey"));
+    }
+
+    @Test
+    void testPaginatedComment_corruptedRedisCache_throwsUncheckedIOException() {
+        String treeId = "tree-id";
+        List<String> children = List.of("c1");
+        SearchCriteria criteria = new SearchCriteria();
+        criteria.setCommentTreeId(treeId);
+        criteria.setOverrideCache(false);
+
+        CommentTree tree = new CommentTree();
+        ObjectNode commentTreeData = JsonNodeFactory.instance.objectNode();
+        commentTreeData.set(Constants.FIRST_LEVEL_NODES, new ObjectMapper().convertValue(children, JsonNode.class));
+        tree.setCommentTreeData(commentTreeData);
+
+        Mockito.when(commentTreeRepository.findById(treeId)).thenReturn(Optional.of(tree));
+        Mockito.when(redisTemplateEx.opsForValue()).thenReturn(valueOperations);
+        Mockito.when(valueOperations.get(Mockito.anyString())).thenReturn("not valid json{{{");
+
+        assertThrows(java.io.UncheckedIOException.class, () -> commentService.paginatedComment(criteria, "v1"));
+    }
+
+    @Test
+    void testPaginatedComment_redisWriteSerializationFails_throwsUncheckedIOException() throws Exception {
+        String treeId = "tree-id";
+        List<String> children = List.of("c1");
+        SearchCriteria criteria = new SearchCriteria();
+        criteria.setCommentTreeId(treeId);
+        criteria.setOverrideCache(true); // skip the redis read, forcing fetch-from-primary + cache write
+
+        CommentTree tree = new CommentTree();
+        ObjectNode commentTreeData = JsonNodeFactory.instance.objectNode();
+        commentTreeData.set(Constants.FIRST_LEVEL_NODES, new ObjectMapper().convertValue(children, JsonNode.class));
+        commentTreeData.put(Constants.ENTITY_ID, "course-id");
+        tree.setCommentTreeData(commentTreeData);
+
+        Mockito.when(commentTreeRepository.findById(treeId)).thenReturn(Optional.of(tree));
+        Mockito.when(commentRepository.findByCommentIdIn(Mockito.anyList(), Mockito.any(Pageable.class)))
+                .thenReturn(new PageImpl<>(new ArrayList<>()));
+
+        // Wrap the real ObjectMapper so every call behaves normally except the write that should fail.
+        ObjectMapper spyMapper = Mockito.spy(new ObjectMapper());
+        doThrow(new com.fasterxml.jackson.core.JsonProcessingException("boom") {})
+                .when(spyMapper).writeValueAsString(any());
+        ReflectionTestUtils.setField(commentService, "objectMapper", spyMapper);
+
+        assertThrows(java.io.UncheckedIOException.class, () -> commentService.paginatedComment(criteria, "v1"));
     }
 
     @Test
@@ -1491,6 +1579,16 @@ class CommentServiceImplTest {
         assertEquals("CommentTree Not found", response.getParams().getErr());
         verify(commentTreeRepository).findById(anyString());
         verify(valueOperations).get(contains(Constants.COMMENT_TREE_REDIS_KEY));
+    }
+
+    @Test
+    void testGenerateRedisJwtTokenKey_signingFails_returnsEmptyString() {
+        // A null secret makes Algorithm.HMAC256 throw, which should be caught and swallowed.
+        ReflectionTestUtils.setField(commentService, "jwtSecretKey", null);
+
+        String result = commentService.generateRedisJwtTokenKey("tree123", 0, 10);
+
+        assertEquals("", result);
     }
 
     private Map<String, Object> validPayload() {

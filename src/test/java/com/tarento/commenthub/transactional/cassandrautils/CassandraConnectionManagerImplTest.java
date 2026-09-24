@@ -3,8 +3,11 @@ package com.tarento.commenthub.transactional.cassandrautils;
 import com.datastax.oss.driver.api.core.ConsistencyLevel;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.CqlSession;
+import com.datastax.oss.driver.api.core.CqlSessionBuilder;
 import com.datastax.oss.driver.api.core.DefaultConsistencyLevel;
+import com.datastax.oss.driver.api.core.metadata.EndPoint;
 import com.datastax.oss.driver.api.core.metadata.Metadata;
+import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metadata.schema.KeyspaceMetadata;
 import com.datastax.oss.driver.api.core.metadata.schema.TableMetadata;
 import com.tarento.commenthub.constant.Constants;
@@ -14,6 +17,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
+import org.mockito.MockedStatic;
 import org.mockito.MockitoAnnotations;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -22,6 +26,7 @@ import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -63,15 +68,10 @@ class CassandraConnectionManagerImplTest {
 
     private ConsistencyLevel invokeGetConsistencyLevel() {
         try {
-            CassandraConnectionManagerImpl manager =
-                    mock(CassandraConnectionManagerImpl.class, CALLS_REAL_METHODS);
-            Field cacheField = CassandraConnectionManagerImpl.class.getDeclaredField("propertiesCache");
-            cacheField.setAccessible(true);
-            cacheField.set(manager, propertiesCache);
-
-            Method method = CassandraConnectionManagerImpl.class.getDeclaredMethod("getConsistencyLevel");
+            Method method = CassandraConnectionManagerImpl.class
+                    .getDeclaredMethod("getConsistencyLevel", PropertiesCache.class);
             method.setAccessible(true);
-            return (ConsistencyLevel) method.invoke(manager);
+            return (ConsistencyLevel) method.invoke(null, propertiesCache);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -177,6 +177,76 @@ class CassandraConnectionManagerImplTest {
                 mock(CassandraConnectionManagerImpl.class, withSettings().defaultAnswer(CALLS_REAL_METHODS));
         CqlSession returned = manager.getSession("ks1");
         assertSame(mockSession, returned);
+    }
+
+    private void stubConnectionProperties() {
+        when(propertiesCache.getProperty(Constants.CASSANDRA_CONFIG_HOST)).thenReturn("127.0.0.1");
+        when(propertiesCache.getProperty(Constants.CORE_CONNECTIONS_PER_HOST_FOR_LOCAL)).thenReturn("1");
+        when(propertiesCache.getProperty(Constants.CORE_CONNECTIONS_PER_HOST_FOR_REMOTE)).thenReturn("1");
+        when(propertiesCache.getProperty(Constants.HEARTBEAT_INTERVAL)).thenReturn("30000");
+        when(propertiesCache.readProperty(Constants.SUNBIRD_CASSANDRA_CONSISTENCY_LEVEL)).thenReturn("LOCAL_QUORUM");
+    }
+
+    private CqlSessionBuilder stubCqlSessionBuilder(CqlSession returnedSession) {
+        CqlSessionBuilder mockBuilder = mock(CqlSessionBuilder.class);
+        when(mockBuilder.addContactPoints(any())).thenReturn(mockBuilder);
+        when(mockBuilder.withLocalDatacenter(anyString())).thenReturn(mockBuilder);
+        lenient().when(mockBuilder.withKeyspace(anyString())).thenReturn(mockBuilder);
+        when(mockBuilder.withConfigLoader(any())).thenReturn(mockBuilder);
+        when(mockBuilder.build()).thenReturn(returnedSession);
+        return mockBuilder;
+    }
+
+    @Test
+    void testConstructor_createsConnection_withoutKeyspace() {
+        stubConnectionProperties();
+
+        CqlSession mockCqlSession = mock(CqlSession.class);
+        Metadata mockMetadata = mock(Metadata.class);
+        Node mockNode = mock(Node.class);
+        when(mockCqlSession.getMetadata()).thenReturn(mockMetadata);
+        when(mockMetadata.getClusterName()).thenReturn(Optional.of("testCluster"));
+        when(mockMetadata.getNodes()).thenReturn(Map.of(UUID.randomUUID(), mockNode));
+        EndPoint mockEndPoint = mock(EndPoint.class);
+        when(mockNode.getDatacenter()).thenReturn("dc1");
+        when(mockNode.getEndPoint()).thenReturn(mockEndPoint);
+        when(mockNode.getRack()).thenReturn("rack1");
+
+        CqlSessionBuilder mockBuilder = stubCqlSessionBuilder(mockCqlSession);
+
+        try (MockedStatic<CqlSession> cqlSessionStatic = mockStatic(CqlSession.class)) {
+            cqlSessionStatic.when(CqlSession::builder).thenReturn(mockBuilder);
+
+            CassandraConnectionManagerImpl manager = new CassandraConnectionManagerImpl(propertiesCache);
+
+            assertNotNull(manager);
+            verify(mockBuilder, never()).withKeyspace(anyString());
+        }
+    }
+
+    @Test
+    void testGetSession_createsNewSession_withKeyspace() throws Exception {
+        stubConnectionProperties();
+
+        CqlSession mockCqlSession = mock(CqlSession.class);
+        Metadata mockMetadata = mock(Metadata.class);
+        when(mockCqlSession.getMetadata()).thenReturn(mockMetadata);
+        when(mockMetadata.getClusterName()).thenReturn(Optional.empty());
+        when(mockMetadata.getNodes()).thenReturn(Map.of());
+
+        CqlSessionBuilder mockBuilder = stubCqlSessionBuilder(mockCqlSession);
+
+        try (MockedStatic<CqlSession> cqlSessionStatic = mockStatic(CqlSession.class)) {
+            cqlSessionStatic.when(CqlSession::builder).thenReturn(mockBuilder);
+
+            CassandraConnectionManagerImpl manager = new CassandraConnectionManagerImpl(propertiesCache);
+            getCassandraSessionMap().clear();
+
+            CqlSession result = manager.getSession("myks");
+
+            assertSame(mockCqlSession, result);
+            verify(mockBuilder).withKeyspace("myks");
+        }
     }
 
     @Test

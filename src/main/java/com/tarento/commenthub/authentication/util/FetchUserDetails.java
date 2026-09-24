@@ -12,6 +12,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.MapUtils;
@@ -72,22 +73,7 @@ public class FetchUserDetails {
   }
 
   private Map<String, Object> toUserMap(Map<String, Object> userInfo) {
-    Map<String, Object> userMap = new HashMap<>();
-
-    // Extract user ID and user name
-    String userId = (String) userInfo.get(Constants.ID);
-    String userName = (String) userInfo.get(Constants.FIRST_NAME);
-
-    userMap.put(Constants.USER_ID_KEY, userId);
-    userMap.put(Constants.FIRST_NAME_KEY, userName);
-
-    // Process profile details if present
-    String profileDetails = (String) userInfo.get(Constants.PROFILE_DETAILS);
-    if (StringUtils.isNotBlank(profileDetails)) {
-      applyProfileDetails(userMap, profileDetails);
-    }
-
-    return userMap;
+    return buildUserMap(userInfo, this::applyProfileDetails);
   }
 
   private void applyProfileDetails(Map<String, Object> userMap, String profileDetails) {
@@ -100,6 +86,38 @@ public class FetchUserDetails {
       throw new UncheckedIOException(e);
     }
 
+    enrichProfileFields(userMap, profileDetailsMap);
+  }
+
+  /**
+   * Shared with {@code HelperMethodService}, which builds the same user map shape but handles a
+   * malformed profileDetails JSON differently (logs and continues instead of throwing).
+   */
+  public static Map<String, Object> buildUserMap(Map<String, Object> userInfo,
+      BiConsumer<Map<String, Object>, String> profileDetailsHandler) {
+    Map<String, Object> userMap = new HashMap<>();
+
+    // Extract user ID and user name
+    String userId = (String) userInfo.get(Constants.ID);
+    String userName = (String) userInfo.get(Constants.FIRST_NAME);
+
+    userMap.put(Constants.USER_ID_KEY, userId);
+    userMap.put(Constants.FIRST_NAME_KEY, userName);
+
+    // Process profile details if present
+    String profileDetails = (String) userInfo.get(Constants.PROFILE_DETAILS);
+    if (StringUtils.isNotBlank(profileDetails)) {
+      profileDetailsHandler.accept(userMap, profileDetails);
+    }
+
+    return userMap;
+  }
+
+  /**
+   * Shared with {@code HelperMethodService}: applies the profile image, designation and
+   * department fields once a profileDetails JSON string has already been parsed.
+   */
+  public static void enrichProfileFields(Map<String, Object> userMap, Map<String, Object> profileDetailsMap) {
     if (MapUtils.isEmpty(profileDetailsMap)) {
       return;
     }

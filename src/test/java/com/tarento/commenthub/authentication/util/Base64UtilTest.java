@@ -165,6 +165,38 @@ class Base64UtilTest {
      * Tests encoding with padding when input length is not a multiple of 3 and newlines are disabled.
      */
     @Test
+    void testEncoderMaxOutputSize() {
+        Base64Util.Encoder encoder = new Base64Util.Encoder(Base64Util.DEFAULT, null);
+        assertEquals(19, encoder.maxOutputSize(6));
+    }
+
+    /**
+     * Drives the package-private Encoder across two process() calls so a tail byte carried
+     * over from the first call completes a tuple that lands exactly on the line-wrap boundary,
+     * covering the newline-emission branch inside the tail-flush path (not reachable through the
+     * public encode() methods, which always call process() exactly once).
+     */
+    @Test
+    void testEncoderTailFlush_triggersLineWrap() {
+        int flags = Base64Util.CRLF; // do_newline=true, do_cr=true, do_padding=true
+        byte[] output = new byte[200];
+        Base64Util.Encoder encoder = new Base64Util.Encoder(flags, output);
+
+        byte[] firstPart = new byte[55]; // 18 complete triples (54 bytes) + 1 tail byte
+        for (int i = 0; i < firstPart.length; i++) {
+            firstPart[i] = (byte) i;
+        }
+        assertTrue(encoder.process(firstPart, 0, firstPart.length, false));
+        assertEquals(1, encoder.tailLen);
+
+        byte[] secondPart = new byte[]{99, 100};
+        assertTrue(encoder.process(secondPart, 0, secondPart.length, true));
+
+        String result = new String(output, 0, encoder.op);
+        assertTrue(result.contains("\r\n"));
+    }
+
+    @Test
     void test_encode_4() {
         byte[] input = {1, 2, 3, 4, 5};
         int offset = 0;

@@ -371,6 +371,27 @@ class CommentTreeServiceImplTest {
     }
 
     @Test
+    void testCreateCommentTree_RedisSerializationFails_ShouldWrapInCommentException() throws Exception {
+        JsonNode payload = createDummyPayload();
+
+        CommentTreeServiceImpl spyService = Mockito.spy(commentTreeService);
+        doReturn("token123").when(spyService).generateJwtTokenKey(any(CommentTreeIdentifierDTO.class));
+
+        when(commentTreeRepository.getIdCount("token123")).thenReturn(0);
+
+        ObjectMapper realMapper = new ObjectMapper();
+        when(objectMapper.createObjectNode()).thenReturn(realMapper.createObjectNode());
+        when(objectMapper.convertValue(any(), eq(Map.class))).thenReturn(new HashMap<>());
+        when(objectMapper.writeValueAsString(any()))
+                .thenThrow(new com.fasterxml.jackson.core.JsonProcessingException("bad json") {});
+
+        CommentException exception = assertThrows(CommentException.class,
+                () -> spyService.createCommentTree(payload));
+
+        assertTrue(exception.getMessage().contains("Failed to serialize resultMap"));
+    }
+
+    @Test
     void testUpdateCommentTree_whenRootLevelComment_thenSuccess() throws Exception {
         JsonNode payload = createPayload(false);
         ObjectNode existingCommentTreeData = createExistingCommentTreeData();

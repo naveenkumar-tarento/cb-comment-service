@@ -2,7 +2,6 @@ package com.tarento.commenthub.transactional.cassandrautils;
 
 import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.cql.*;
-import com.datastax.oss.driver.api.querybuilder.select.Select;
 import com.tarento.commenthub.constant.Constants;
 import com.tarento.commenthub.transactional.utils.ApiResponse;
 import org.junit.jupiter.api.BeforeEach;
@@ -61,22 +60,16 @@ class CassandraOperationImplTest {
         when(cassandraUtil.getPreparedStatement(anyString(), anyString(), any())).thenReturn("INSERT INTO testKeyspace.testTable (id, name) VALUES (?, ?)");
 
         when(mockSession.prepare(anyString())).thenReturn(mockPreparedStatement);
-        when(mockPreparedStatement.bind(any())).thenReturn(mockBoundStatement);
+        when(mockPreparedStatement.bind(any(Object[].class))).thenReturn(mockBoundStatement);
         when(mockSession.execute(any(BoundStatement.class))).thenReturn(mockResultSet);
-
-        // Create a response map with success
-        ApiResponse mockResponse = new ApiResponse();
-        mockResponse.put(Constants.RESPONSE, Constants.SUCCESS);
 
         // Act
         ApiResponse response = (ApiResponse) cassandraOperation.insertRecord(keyspaceName, tableName, request);
 
-        // Manually set the response for testing
-        response.put(Constants.RESPONSE, Constants.SUCCESS);
-
         // Assert
         assertEquals("success", response.get(Constants.RESPONSE));
         verify(mockSession).prepare(anyString());
+        verify(mockSession).execute(mockBoundStatement);
     }
 
     @Test
@@ -174,15 +167,8 @@ class CassandraOperationImplTest {
         List<String> fields = List.of("id", "name");
         String key = "id";
 
-        // Prepare mocks
-        SimpleStatement statement = SimpleStatement.newInstance("SELECT * FROM test");
-
-        // Spy on the private processQuery method via doReturn (assuming it returns Select instance)
-        Select mockSelect = mock(Select.class);
-        when(mockSelect.build()).thenReturn(statement);
-
         when(connectionManager.getSession(localKeyspaceName)).thenReturn(mockSession);
-        when(mockSession.execute(statement)).thenReturn(mockResultSet);
+        when(mockSession.execute(any(SimpleStatement.class))).thenReturn(mockResultSet);
 
         List<Map<String, Object>> mockedResponse = List.of(Map.of("id", 1, "name", "Test"));
         when(cassandraUtil.createResponse(mockResultSet)).thenReturn(mockedResponse);
@@ -191,7 +177,58 @@ class CassandraOperationImplTest {
         List<Map<String, Object>> response = cassandraOperation.getRecordsByPropertiesByKey(localKeyspaceName, localTableName, propertyMap, fields, key);
 
         // Assertions
-        assertNotNull(response);
+        assertEquals(mockedResponse, response);
+    }
+
+    @Test
+    void testGetRecordsByPropertiesByKey_withListValueProperty_buildsInClause() {
+        String localKeyspaceName = "test_keyspace";
+        String localTableName = "test_table";
+        Map<String, Object> propertyMap = Map.of("id", List.of("1", "2", "3"));
+        List<String> fields = List.of("id", "name");
+
+        when(connectionManager.getSession(localKeyspaceName)).thenReturn(mockSession);
+        when(mockSession.execute(any(SimpleStatement.class))).thenReturn(mockResultSet);
+
+        List<Map<String, Object>> mockedResponse = List.of(Map.of("id", 1, "name", "Test"));
+        when(cassandraUtil.createResponse(mockResultSet)).thenReturn(mockedResponse);
+
+        List<Map<String, Object>> response = cassandraOperation.getRecordsByPropertiesByKey(
+                localKeyspaceName, localTableName, propertyMap, fields, "id");
+
+        assertEquals(mockedResponse, response);
+    }
+
+    @Test
+    void testGetRecordsByPropertiesByKey_emptyPropertyMap_selectsAll() {
+        String localKeyspaceName = "test_keyspace";
+        String localTableName = "test_table";
+
+        when(connectionManager.getSession(localKeyspaceName)).thenReturn(mockSession);
+        when(mockSession.execute(any(SimpleStatement.class))).thenReturn(mockResultSet);
+
+        List<Map<String, Object>> mockedResponse = List.of(Map.of("id", 1));
+        when(cassandraUtil.createResponse(mockResultSet)).thenReturn(mockedResponse);
+
+        List<Map<String, Object>> response = cassandraOperation.getRecordsByPropertiesByKey(
+                localKeyspaceName, localTableName, Collections.emptyMap(), List.of("id"), "id");
+
+        assertEquals(mockedResponse, response);
+    }
+
+    @Test
+    void testGetRecordsByPropertiesWithoutFiltering_fourArgOverload_delegatesWithNullLimit() {
+        Map<String, Object> propertyMap = Map.of("id", "123");
+        List<String> fields = List.of("id");
+
+        when(mockSession.execute(any(SimpleStatement.class))).thenReturn(mockResultSet);
+        List<Map<String, Object>> mockedResponse = List.of(Map.of("id", "123"));
+        when(cassandraUtil.createResponse(mockResultSet)).thenReturn(mockedResponse);
+
+        List<Map<String, Object>> response =
+                cassandraOperation.getRecordsByPropertiesWithoutFiltering(keyspaceName, tableName, propertyMap, fields);
+
+        assertEquals(mockedResponse, response);
     }
 
     @Test

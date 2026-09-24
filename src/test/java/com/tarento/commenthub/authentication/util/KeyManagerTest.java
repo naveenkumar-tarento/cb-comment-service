@@ -11,6 +11,7 @@ import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
@@ -21,8 +22,6 @@ import java.nio.file.Paths;
 import java.security.KeyFactory;
 import java.security.PublicKey;
 import java.security.spec.X509EncodedKeySpec;
-import java.util.Arrays;
-import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
 
@@ -72,42 +71,45 @@ class KeyManagerTest {
     }
 
     @Test
-    void testInit_SuccessfulKeyLoading() {
-        // Create a mock Path for the test key file
-        Path mockKeyPath = mock(Path.class);
+    void testInit_SuccessfulKeyLoading(@TempDir Path tempDir) throws IOException {
+        // Use a real temp directory so file-system access happens for real; only the RSA
+        // parsing itself is mocked out (already exercised by testLoadPublicKey_*).
+        Path keyFile = tempDir.resolve(TEST_KEY_ID);
+        Files.writeString(keyFile, TEST_PUBLIC_KEY);
 
-        // Mock the Files.walk method
-        try (MockedStatic<Files> filesMock = Mockito.mockStatic(Files.class);
-             MockedStatic<Paths> pathsMock = Mockito.mockStatic(Paths.class)) {
+        when(propertiesCache.getProperty(Constants.ACCESS_TOKEN_PUBLICKEY_BASEPATH))
+            .thenReturn(tempDir.toString());
 
-            // Mock Paths.get to return our mock path
-            Path basePath = mock(Path.class);
-            pathsMock.when(() -> Paths.get(TEST_BASE_PATH)).thenReturn(basePath);
-            pathsMock.when(() -> Paths.get(anyString())).thenReturn(mockKeyPath);
+        try (MockedStatic<KeyManager> keyManagerMock = Mockito.mockStatic(KeyManager.class)) {
+            PublicKey mockPublicKey = mock(PublicKey.class);
+            keyManagerMock.when(() -> KeyManager.loadPublicKey(anyString())).thenReturn(mockPublicKey);
 
-            // Mock Files.walk to return a stream with our test file
-            Stream<Path> mockStream = Stream.of(mockKeyPath);
-            filesMock.when(() -> Files.walk(basePath)).thenReturn(mockStream);
+            // Call the init method
+            keyManager.init();
 
-            // Mock Files.isRegularFile to return true for our test path
-            filesMock.when(() -> Files.isRegularFile(mockKeyPath)).thenReturn(true);
+            // Verify the key was added to the keyMap
+            KeyData keyData = keyManager.getPublicKey(TEST_KEY_ID);
+            assertNotNull(keyData);
+            assertEquals(TEST_KEY_ID, keyData.getKeyId());
+            assertEquals(mockPublicKey, keyData.getPublicKey());
+        }
+    }
 
-            // Mock Files.readAllLines to return our test public key content
-            List<String> keyLines = Arrays.asList(TEST_PUBLIC_KEY.split("\n"));
-            filesMock.when(() -> Files.readAllLines(mockKeyPath, StandardCharsets.UTF_8)).thenReturn(keyLines);
+    @Test
+    void testInit_KeyParsingFails_isSkippedAndLogged(@TempDir Path tempDir) throws IOException {
+        Path keyFile = tempDir.resolve(TEST_KEY_ID);
+        Files.writeString(keyFile, TEST_PUBLIC_KEY);
 
-            // Mock the loadPublicKey method
-            try (MockedStatic<KeyManager> keyManagerMock = Mockito.mockStatic(KeyManager.class)) {
-                PublicKey mockPublicKey = mock(PublicKey.class);
-                keyManagerMock.when(() -> KeyManager.loadPublicKey(anyString())).thenReturn(mockPublicKey);
+        when(propertiesCache.getProperty(Constants.ACCESS_TOKEN_PUBLICKEY_BASEPATH))
+            .thenReturn(tempDir.toString());
 
-                // Call the init method
-                keyManager.init();
+        try (MockedStatic<KeyManager> keyManagerMock = Mockito.mockStatic(KeyManager.class)) {
+            keyManagerMock.when(() -> KeyManager.loadPublicKey(anyString()))
+                .thenThrow(new RuntimeException("bad key"));
 
-                // Verify the key was added to the keyMap
-                KeyData keyData = keyManager.getPublicKey(TEST_KEY_ID);
-                assertNull(keyData);
-            }
+            assertDoesNotThrow(() -> keyManager.init());
+
+            assertNull(keyManager.getPublicKey(TEST_KEY_ID));
         }
     }
 
