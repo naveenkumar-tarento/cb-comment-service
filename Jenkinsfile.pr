@@ -1,3 +1,0 @@
-@Library('central-pipeline-lib@main') _
-
-prValidationPipeline()
