@@ -35,6 +35,7 @@ import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.lang.reflect.Method;
 import java.sql.Timestamp;
 import java.util.*;
 
@@ -1589,6 +1590,519 @@ class CommentServiceImplTest {
         String result = commentService.generateRedisJwtTokenKey("tree123", 0, 10);
 
         assertEquals("", result);
+    }
+
+    // ---- Additional coverage tests (Sonar coverage closing) ----
+    // NOTE: updateExistingComment's "paylaod.get(COMMENT_ID) == null" disjunct (line 156) and
+    // likeComment's "!optComment.isPresent() && optComment.get()..." true-branch body (lines
+    // 433-436) are unreachable via the public API: the JSON-schema validation that runs first
+    // always requires the "commentId" key to be present (schema `required`), and the likeComment
+    // condition throws NoSuchElementException from optComment.get() before the branch body can
+    // ever execute (see testLikeComment_CommentNotFound_ThrowsNoSuchElementException below).
+
+    @Test
+    void testUpdateExistingComment_ExistingLikeFieldIsJsonNull_DoesNotCopyLike() {
+        String localCommentId = "comment123";
+        String localUserId = "user123";
+        String commentTreeId = "tree123";
+        ObjectNode testPayload = JsonNodeFactory.instance.objectNode();
+        testPayload.put("commentId", localCommentId);
+        testPayload.put("commentTreeId", commentTreeId);
+        ObjectNode commentData = JsonNodeFactory.instance.objectNode();
+        commentData.put("comment", "Updated comment text");
+        commentData.put("commentResolved", "false");
+        ObjectNode commentSource = JsonNodeFactory.instance.objectNode();
+        commentSource.put("userId", localUserId);
+        commentSource.put("userPic", "https://example.com/pic.jpg");
+        commentSource.put("userRole", "TESTER");
+        commentData.set("commentSource", commentSource);
+        testPayload.set("commentData", commentData);
+
+        Comment existingComment = new Comment();
+        existingComment.setCommentId(localCommentId);
+        existingComment.setStatus("ACTIVE");
+        ObjectNode existingCommentData = JsonNodeFactory.instance.objectNode();
+        ObjectNode existingCommentSource = JsonNodeFactory.instance.objectNode();
+        existingCommentSource.put("userId", localUserId);
+        existingCommentData.set("commentSource", existingCommentSource);
+        existingCommentData.set("like", JsonNodeFactory.instance.nullNode());
+        existingComment.setCommentData(existingCommentData);
+
+        when(commentRepository.findById(localCommentId)).thenReturn(Optional.of(existingComment));
+        when(commentRepository.save(any(Comment.class))).thenAnswer(i -> i.getArguments()[0]);
+        when(commentTreeService.getCommentTreeById(commentTreeId)).thenReturn(mockCommentTree);
+        when(redisTemplateEx.opsForValue()).thenReturn(valueOperations);
+        when(helperMethodService.processMentionedUsers(any(), any())).thenReturn(Collections.emptyList());
+
+        ResponseDTO response = commentService.updateExistingComment(testPayload);
+        assertNotNull(response);
+        assertFalse(response.getComment().getCommentData().has("like"));
+    }
+
+    @Test
+    void testAddFirstCommentToCreateTree_RedisSerializationFails_ThrowsCommentException() throws Exception {
+        ObjectNode testPayload = JsonNodeFactory.instance.objectNode();
+        ObjectNode commentData = JsonNodeFactory.instance.objectNode();
+        commentData.put("comment", "First test comment");
+        ObjectNode commentSource = JsonNodeFactory.instance.objectNode();
+        commentSource.put("userId", userId);
+        commentSource.put("userPic", "https://example.com/pic.jpg");
+        commentSource.put("userRole", "TESTER");
+        commentData.set("commentSource", commentSource);
+        testPayload.set("commentData", commentData);
+        ObjectNode commentTreeData = JsonNodeFactory.instance.objectNode();
+        commentTreeData.put("entityId", "entity123");
+        commentTreeData.put("entityType", "TEST_ENTITY");
+        commentTreeData.put("workflow", "DEFAULT_WORKFLOW");
+        testPayload.set("commentTreeData", commentTreeData);
+
+        Comment mockComment = new Comment();
+        mockComment.setCommentId("comment123");
+        mockComment.setStatus("ACTIVE");
+        mockComment.setCommentData(commentData);
+        when(commentRepository.save(any(Comment.class))).thenReturn(mockComment);
+
+        ObjectMapper spyMapper = Mockito.spy(new ObjectMapper());
+        doThrow(new com.fasterxml.jackson.core.JsonProcessingException("boom") {})
+                .when(spyMapper).writeValueAsString(any());
+        ReflectionTestUtils.setField(commentService, "objectMapper", spyMapper);
+
+        CommentException exception = assertThrows(CommentException.class,
+                () -> commentService.addFirstCommentToCreateTree(testPayload));
+        assertTrue(exception.getMessage().contains("Failed to store comment in Redis"));
+    }
+
+    @Test
+    void testUpdateExistingComment_RedisCacheWriteFails_StillSucceeds() throws Exception {
+        String localCommentId = "comment123";
+        String localUserId = "user123";
+        String commentTreeId = "tree123";
+        ObjectNode testPayload = JsonNodeFactory.instance.objectNode();
+        testPayload.put("commentId", localCommentId);
+        testPayload.put("commentTreeId", commentTreeId);
+        ObjectNode commentData = JsonNodeFactory.instance.objectNode();
+        commentData.put("comment", "Updated comment text");
+        commentData.put("commentResolved", "false");
+        ObjectNode commentSource = JsonNodeFactory.instance.objectNode();
+        commentSource.put("userId", localUserId);
+        commentSource.put("userPic", "https://example.com/pic.jpg");
+        commentSource.put("userRole", "TESTER");
+        commentData.set("commentSource", commentSource);
+        testPayload.set("commentData", commentData);
+
+        Comment existingComment = new Comment();
+        existingComment.setCommentId(localCommentId);
+        existingComment.setStatus("ACTIVE");
+        ObjectNode existingCommentData = JsonNodeFactory.instance.objectNode();
+        ObjectNode existingCommentSource = JsonNodeFactory.instance.objectNode();
+        existingCommentSource.put("userId", localUserId);
+        existingCommentData.set("commentSource", existingCommentSource);
+        existingComment.setCommentData(existingCommentData);
+
+        when(commentRepository.findById(localCommentId)).thenReturn(Optional.of(existingComment));
+        when(commentRepository.save(any(Comment.class))).thenAnswer(i -> i.getArguments()[0]);
+        when(commentTreeService.getCommentTreeById(commentTreeId)).thenReturn(mockCommentTree);
+        when(helperMethodService.processMentionedUsers(any(), any())).thenReturn(Collections.emptyList());
+
+        ObjectMapper spyMapper = Mockito.spy(new ObjectMapper());
+        doThrow(new com.fasterxml.jackson.core.JsonProcessingException("boom") {})
+                .when(spyMapper).writeValueAsString(any());
+        ReflectionTestUtils.setField(commentService, "objectMapper", spyMapper);
+
+        // The redis caching failure inside cacheCommentInRedis is swallowed internally,
+        // so the overall update should still succeed.
+        ResponseDTO response = commentService.updateExistingComment(testPayload);
+        assertNotNull(response);
+        assertNotNull(response.getComment());
+    }
+
+    @Test
+    void testDeleteCommentById_BlankUserId_ThrowsException() {
+        CommentTreeIdentifierDTO identifierDTO = new CommentTreeIdentifierDTO("TEST_ENTITY", "entity123", "TEST_WORKFLOW");
+        when(accessTokenValidator.verifyUserToken(VALID_TOKEN)).thenReturn("");
+
+        CommentException exception = assertThrows(CommentException.class,
+                () -> commentService.deleteCommentById(COMMENT_ID, identifierDTO, VALID_TOKEN, PARENT_ID));
+
+        assertEquals("Not a valid user", exception.getMessage());
+    }
+
+    @Test
+    void testGetComments_CommentSourceMissingUserId_SkipsOwnerExtraction() {
+        CommentTreeIdentifierDTO identifierDTO = new CommentTreeIdentifierDTO("TEST_ENTITY", "entity123", "TEST_WORKFLOW");
+        CommentTree localMockCommentTree = new CommentTree();
+        ObjectNode commentTreeData = JsonNodeFactory.instance.objectNode();
+        ArrayNode childNodes = JsonNodeFactory.instance.arrayNode();
+        childNodes.add("comment123");
+        commentTreeData.set(Constants.CHILD_NODES, childNodes);
+        localMockCommentTree.setCommentTreeData(commentTreeData);
+
+        Comment comment = new Comment();
+        comment.setCommentId("comment123");
+        ObjectNode commentData = JsonNodeFactory.instance.objectNode();
+        // commentSource present, but no userId key inside it
+        commentData.set(Constants.COMMENT_SOURCE, JsonNodeFactory.instance.objectNode());
+        comment.setCommentData(commentData);
+
+        when(commentTreeService.getCommentTree(identifierDTO)).thenReturn(localMockCommentTree);
+        when(commentRepository.findByCommentIdInAndStatus(anyList(), eq("active")))
+                .thenReturn(Collections.singletonList(comment));
+
+        CommentsResoponseDTO response = commentService.getComments(identifierDTO);
+
+        assertNotNull(response);
+        assertEquals(1, response.getCommentCount());
+        assertTrue(response.getUsers().isEmpty());
+        verify(fetchUser, never()).fetchDataForKeys(anyList());
+    }
+
+    @Test
+    void testGetComments_TaggedUsersNotArray_SkipsTaggedExtraction() {
+        CommentTreeIdentifierDTO identifierDTO = new CommentTreeIdentifierDTO("TEST_ENTITY", "entity123", "TEST_WORKFLOW");
+        CommentTree localMockCommentTree = new CommentTree();
+        ObjectNode commentTreeData = JsonNodeFactory.instance.objectNode();
+        ArrayNode childNodes = JsonNodeFactory.instance.arrayNode();
+        childNodes.add("comment123");
+        commentTreeData.set(Constants.CHILD_NODES, childNodes);
+        localMockCommentTree.setCommentTreeData(commentTreeData);
+
+        Comment comment = new Comment();
+        comment.setCommentId("comment123");
+        ObjectNode commentData = JsonNodeFactory.instance.objectNode();
+        ObjectNode commentSource = JsonNodeFactory.instance.objectNode();
+        commentSource.put(Constants.USER_ID, userId);
+        commentData.set(Constants.COMMENT_SOURCE, commentSource);
+        // taggedUsers present but not an array
+        commentData.put(Constants.TAGGED_USERS, "not-an-array");
+        comment.setCommentData(commentData);
+
+        when(commentTreeService.getCommentTree(identifierDTO)).thenReturn(localMockCommentTree);
+        when(commentRepository.findByCommentIdInAndStatus(anyList(), eq("active")))
+                .thenReturn(Collections.singletonList(comment));
+
+        CommentsResoponseDTO response = commentService.getComments(identifierDTO);
+
+        assertNotNull(response);
+        assertTrue(response.getTaggedUsers().isEmpty());
+    }
+
+    @Test
+    void testLikeComment_CommentNotFound_ThrowsNoSuchElementException() {
+        Map<String, Object> likePayload = validPayload();
+        when(commentRepository.findById("c1")).thenReturn(Optional.empty());
+
+        // `!optComment.isPresent() && optComment.get()...` is a latent bug: when the comment is
+        // not present, calling optComment.get() throws rather than returning the bad-request
+        // response built by the dead branch below it.
+        assertThrows(NoSuchElementException.class, () -> commentService.likeComment(likePayload));
+    }
+
+    @Test
+    void testLikeCommentWithExistingRecordButEmptyCommentIds_createsNewRecord() {
+        Map<String, Object> likePayload = validPayload();
+
+        ObjectNode commentData = objectMapper.createObjectNode();
+        commentData.put(Constants.LIKE, 0);
+        Comment comment = new Comment();
+        comment.setCommentData(commentData);
+
+        UserCourseCommentLike like = new UserCourseCommentLike();
+        like.setCommentIds(new ArrayList<>());
+
+        when(commentRepository.findById("c1")).thenReturn(Optional.of(comment));
+        when(userCommentLikeRepository.findById(any())).thenReturn(Optional.of(like));
+        when(commentRepository.save(any())).thenReturn(comment);
+
+        ApiResponse response = commentService.likeComment(likePayload);
+
+        assertEquals(HttpStatus.OK, response.getResponseCode());
+        verify(userCommentLikeRepository).save(argThat(r -> r.getCommentIds().contains("c1")));
+    }
+
+    @Test
+    void testLikeComment_NoExistingLikeField_DefaultsToOne() {
+        Map<String, Object> likePayload = validPayload();
+
+        ObjectNode commentData = objectMapper.createObjectNode(); // no "like" field at all
+        Comment comment = new Comment();
+        comment.setCommentData(commentData);
+
+        when(commentRepository.findById("c1")).thenReturn(Optional.of(comment));
+        when(userCommentLikeRepository.findById(any())).thenReturn(Optional.empty());
+        when(commentRepository.save(any())).thenReturn(comment);
+
+        ApiResponse response = commentService.likeComment(likePayload);
+
+        assertEquals(HttpStatus.OK, response.getResponseCode());
+        assertEquals(1, commentData.get(Constants.LIKE).asInt());
+    }
+
+    @Test
+    void testLikeComment_DislikeFlag_ValidatesSuccessfully() {
+        Map<String, Object> likePayload = new HashMap<>();
+        likePayload.put(COMMENT_ID, "c1");
+        likePayload.put(Constants.USERID, "u1");
+        likePayload.put(Constants.COURSEID, "course1");
+        likePayload.put(Constants.FLAG, Constants.DISLIKE);
+
+        ObjectNode commentData = objectMapper.createObjectNode();
+        commentData.put(Constants.LIKE, 0);
+        Comment comment = new Comment();
+        comment.setCommentData(commentData);
+
+        when(commentRepository.findById("c1")).thenReturn(Optional.of(comment));
+        when(userCommentLikeRepository.findById(any())).thenReturn(Optional.empty());
+        when(commentRepository.save(any())).thenReturn(comment);
+
+        ApiResponse response = commentService.likeComment(likePayload);
+        assertEquals(HttpStatus.OK, response.getResponseCode());
+    }
+
+    @Test
+    void testPaginatedComment_withExplicitLimitAndOffset() {
+        String treeId = "tree-id";
+        List<String> children = List.of("c1");
+        SearchCriteria criteria = new SearchCriteria();
+        criteria.setCommentTreeId(treeId);
+        criteria.setOverrideCache(false);
+        criteria.setLimit(5);
+        criteria.setOffset(2);
+
+        CommentTree tree = new CommentTree();
+        ObjectNode commentTreeData = JsonNodeFactory.instance.objectNode();
+        commentTreeData.set(Constants.FIRST_LEVEL_NODES, new ObjectMapper().convertValue(children, JsonNode.class));
+        tree.setCommentTreeData(commentTreeData);
+
+        Mockito.when(commentTreeRepository.findById(treeId)).thenReturn(Optional.of(tree));
+        Mockito.when(redisTemplateEx.opsForValue()).thenReturn(valueOperations);
+        Mockito.when(valueOperations.get(Mockito.anyString())).thenReturn(null);
+        Mockito.when(commentRepository.findByCommentIdIn(Mockito.anyList(), Mockito.any(Pageable.class)))
+                .thenReturn(new PageImpl<>(new ArrayList<>()));
+
+        ApiResponse response = commentService.paginatedComment(criteria, "v1");
+
+        assertEquals(HttpStatus.OK, response.getResponseCode());
+    }
+
+    @Test
+    void testFetchCommentFromPrimary_AllOptionalFieldsMissing_viaReflection() throws Exception {
+        CommentTree tree = new CommentTree();
+        ObjectNode commentTreeData = JsonNodeFactory.instance.objectNode();
+        // entityId, firstLevelNodes and childNodes are all absent
+        tree.setCommentTreeData(commentTreeData);
+
+        when(commentRepository.findByCommentIdIn(anyList(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(new ArrayList<>()));
+
+        Method method = CommentServiceImpl.class.getDeclaredMethod(
+                "fetchCommentFromPrimary", int.class, int.class, List.class, CommentTree.class, String.class);
+        method.setAccessible(true);
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> result = (Map<String, Object>) method.invoke(
+                commentService, 0, 10, new ArrayList<String>(), tree, "v2");
+
+        assertNotNull(result);
+        verify(contentService, never()).readContentFromCache(anyString(), any());
+    }
+
+    @Test
+    void testFetchCommentFromPrimary_AllOptionalFieldsJsonNull_viaReflection() throws Exception {
+        CommentTree tree = new CommentTree();
+        ObjectNode commentTreeData = JsonNodeFactory.instance.objectNode();
+        commentTreeData.set(Constants.ENTITY_ID, JsonNodeFactory.instance.nullNode());
+        commentTreeData.set(Constants.FIRST_LEVEL_NODES, JsonNodeFactory.instance.nullNode());
+        commentTreeData.set(Constants.CHILD_NODES, JsonNodeFactory.instance.nullNode());
+        tree.setCommentTreeData(commentTreeData);
+
+        when(commentRepository.findByCommentIdIn(anyList(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(new ArrayList<>()));
+
+        Method method = CommentServiceImpl.class.getDeclaredMethod(
+                "fetchCommentFromPrimary", int.class, int.class, List.class, CommentTree.class, String.class);
+        method.setAccessible(true);
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> result = (Map<String, Object>) method.invoke(
+                commentService, 0, 10, new ArrayList<String>(), tree, "v2");
+
+        assertNotNull(result);
+        verify(contentService, never()).readContentFromCache(anyString(), any());
+    }
+
+    @Test
+    void testAddFirstCommentToCreateTree_EmptyMentionedUsersArray_SkipsDeduplication() {
+        ObjectNode testPayload = JsonNodeFactory.instance.objectNode();
+        ObjectNode commentData = JsonNodeFactory.instance.objectNode();
+        commentData.put("comment", "First test comment");
+        ObjectNode commentSource = JsonNodeFactory.instance.objectNode();
+        commentSource.put("userId", userId);
+        commentSource.put("userPic", "https://example.com/pic.jpg");
+        commentSource.put("userRole", "TESTER");
+        commentData.set("commentSource", commentSource);
+        commentData.set("mentionedUsers", JsonNodeFactory.instance.arrayNode());
+        testPayload.set("commentData", commentData);
+        ObjectNode commentTreeData = JsonNodeFactory.instance.objectNode();
+        commentTreeData.put("entityId", "entity123");
+        commentTreeData.put("entityType", "TEST_ENTITY");
+        commentTreeData.put("workflow", "DEFAULT_WORKFLOW");
+        testPayload.set("commentTreeData", commentTreeData);
+
+        Comment mockComment = new Comment();
+        mockComment.setCommentId("comment123");
+        mockComment.setStatus("ACTIVE");
+        mockComment.setCommentData(commentData);
+        CommentTree localMockCommentTree = new CommentTree();
+        localMockCommentTree.setCommentTreeId("tree123");
+
+        when(redisTemplateEx.opsForValue()).thenReturn(valueOperations);
+        when(commentRepository.save(any(Comment.class))).thenReturn(mockComment);
+        when(commentTreeService.createCommentTree(any(JsonNode.class))).thenReturn(localMockCommentTree);
+
+        ResponseDTO response = commentService.addFirstCommentToCreateTree(testPayload);
+
+        assertNotNull(response);
+        assertEquals(0, commentData.get("mentionedUsers").size());
+    }
+
+    @Test
+    void testAddFirstCommentToCreateTree_MentionedUserWithBlankUserId_IsSkipped() {
+        ObjectNode testPayload = JsonNodeFactory.instance.objectNode();
+        ObjectNode commentData = JsonNodeFactory.instance.objectNode();
+        commentData.put("comment", "First test comment");
+        ObjectNode commentSource = JsonNodeFactory.instance.objectNode();
+        commentSource.put("userId", userId);
+        commentSource.put("userPic", "https://example.com/pic.jpg");
+        commentSource.put("userRole", "TESTER");
+        commentData.set("commentSource", commentSource);
+
+        ArrayNode mentionedUsers = JsonNodeFactory.instance.arrayNode();
+        ObjectNode blankMention = JsonNodeFactory.instance.objectNode();
+        blankMention.put("userId", "");
+        blankMention.put("userName", "Blank User");
+        ObjectNode validMention = JsonNodeFactory.instance.objectNode();
+        validMention.put("userId", "userX");
+        validMention.put("userName", "User X");
+        mentionedUsers.add(blankMention);
+        mentionedUsers.add(validMention);
+        commentData.set("mentionedUsers", mentionedUsers);
+
+        testPayload.set("commentData", commentData);
+        ObjectNode commentTreeData = JsonNodeFactory.instance.objectNode();
+        commentTreeData.put("entityId", "entity123");
+        commentTreeData.put("entityType", "TEST_ENTITY");
+        commentTreeData.put("workflow", "DEFAULT_WORKFLOW");
+        testPayload.set("commentTreeData", commentTreeData);
+
+        Comment mockComment = new Comment();
+        mockComment.setCommentId("comment123");
+        mockComment.setStatus("ACTIVE");
+        mockComment.setCommentData(commentData);
+        CommentTree localMockCommentTree = new CommentTree();
+        localMockCommentTree.setCommentTreeId("tree123");
+
+        when(redisTemplateEx.opsForValue()).thenReturn(valueOperations);
+        when(commentRepository.save(any(Comment.class))).thenReturn(mockComment);
+        when(commentTreeService.createCommentTree(any(JsonNode.class))).thenReturn(localMockCommentTree);
+
+        ResponseDTO response = commentService.addFirstCommentToCreateTree(testPayload);
+
+        assertNotNull(response);
+        JsonNode dedupedMentions = commentData.get("mentionedUsers");
+        assertEquals(1, dedupedMentions.size());
+        assertEquals("userX", dedupedMentions.get(0).get("userId").asText());
+    }
+
+    @Test
+    void testReportComment_ReportedReasonAbsent_StillSucceeds() {
+        Map<String, Object> request = new HashMap<>();
+        request.put(COMMENT_ID, commentId);
+        // no REPORTED_REASON key present at all
+
+        ObjectNode commentData = new ObjectMapper().createObjectNode();
+        Comment comment = new Comment();
+        comment.setCommentId(commentId);
+        comment.setStatus("ACTIVE");
+        comment.setCommentData(commentData);
+
+        when(accessTokenValidator.verifyUserToken(token)).thenReturn(userId);
+        when(commentRepository.findById(commentId)).thenReturn(Optional.of(comment));
+        when(commentRepository.save(any(Comment.class))).thenReturn(comment);
+
+        ApiResponse response = commentService.reportComment(request, token);
+
+        assertEquals(HttpStatus.OK, response.getResponseCode());
+    }
+
+    @Test
+    void testReportComment_AllFieldsAbsent_ValidationPassesButCommentNotFound() {
+        Map<String, Object> request = new HashMap<>(); // no commentId, no reportedReason
+        when(accessTokenValidator.verifyUserToken(token)).thenReturn(userId);
+
+        ApiResponse response = commentService.reportComment(request, token);
+
+        assertEquals(HttpStatus.NOT_FOUND, response.getResponseCode());
+    }
+
+    @Test
+    void testReportComment_ValidationFails_OthersWithBlankOtherReason() {
+        Map<String, Object> request = new HashMap<>();
+        request.put(COMMENT_ID, "cid");
+        request.put(Constants.REPORTED_REASON, List.of("Others"));
+        request.put(Constants.OTHER_REASON, "   "); // present but blank
+
+        when(accessTokenValidator.verifyUserToken(anyString())).thenReturn("user-123");
+
+        ApiResponse response = commentService.reportComment(request, "token");
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getResponseCode());
+        assertTrue(response.getParams().getErr().contains(Constants.OTHER_REASON));
+    }
+
+    @Test
+    void testReportComment_BlankUserIdToken_ReturnsBadRequest() {
+        Map<String, Object> request = new HashMap<>();
+        when(accessTokenValidator.verifyUserToken("blank-token")).thenReturn("");
+
+        ApiResponse response = commentService.reportComment(request, "blank-token");
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getResponseCode());
+        assertEquals(Constants.INVALID_USER, response.getParams().getErr());
+    }
+
+    @Test
+    void testPaginatedComment_BlankTreeId_NonBlankEntityFields_PassesValidation() {
+        SearchCriteria criteria = new SearchCriteria();
+        criteria.setCommentTreeId("");
+        criteria.setEntityType("COURSE");
+        criteria.setEntityId("entity1");
+        criteria.setWorkflow("wf1");
+
+        when(commentTreeRepository.findById(anyString())).thenReturn(Optional.empty());
+
+        ApiResponse response = commentService.paginatedComment(criteria, "v1");
+
+        assertEquals(HttpStatus.NOT_FOUND, response.getResponseCode());
+        verify(commentTreeRepository).findById(anyString());
+    }
+
+    @Test
+    void testPaginatedComment_BlankTreeId_BlankEntityType_NonBlankWorkflow_PassesValidation() {
+        // commentTreeId and entityType are blank but workflow is not, flipping the
+        // "searchCriteria.getWorkflow().isEmpty()" sub-condition to false so the overall
+        // validateSearchPayload AND-chain is false (validation passes). The subsequent
+        // resolveCommentTreeId/generateJwtTokenKey call then fails because entityType is blank,
+        // which is expected real behaviour, not a test-harness problem.
+        SearchCriteria criteria = new SearchCriteria();
+        criteria.setCommentTreeId("");
+        criteria.setEntityType("");
+        criteria.setEntityId("entity1");
+        criteria.setWorkflow("wf1");
+
+        CommentException exception = assertThrows(CommentException.class,
+                () -> commentService.paginatedComment(criteria, "v1"));
+        assertTrue(exception.getMessage().contains("mandatory"));
+        verify(commentTreeRepository, never()).findById(anyString());
     }
 
     private Map<String, Object> validPayload() {

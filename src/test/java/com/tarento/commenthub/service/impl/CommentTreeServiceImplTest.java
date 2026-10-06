@@ -159,6 +159,106 @@ class CommentTreeServiceImplTest {
     }
 
     @Test
+    void testFindTargetNode_returnsNullWhenCurrentNodeNotArray() {
+        // currentNode is a plain object (not an array), so isArray() is false
+        // and the method should fall through to returning null without looping.
+        ObjectMapper mapper = new ObjectMapper();
+        ObjectNode notArray = mapper.createObjectNode();
+        notArray.put(Constants.COMMENT_ID, "x");
+
+        JsonNode result = CommentTreeServiceImpl.findTargetNode(notArray, new String[]{"x"}, 0);
+        assertNull(result);
+    }
+
+    @Test
+    void testFindTargetNode_skipsNonObjectAndMismatchedNodes_returnsNull() {
+        // Array contains a non-object element (isObject() false) and an object
+        // whose commentId does not match the target, so the loop runs to
+        // completion without ever matching, falling through to return null.
+        ObjectMapper mapper = new ObjectMapper();
+        ArrayNode array = mapper.createArrayNode();
+        array.add("plainTextNode");
+
+        ObjectNode mismatched = mapper.createObjectNode();
+        mismatched.put(Constants.COMMENT_ID, "other");
+        array.add(mismatched);
+
+        JsonNode result = CommentTreeServiceImpl.findTargetNode(array, new String[]{"missing"}, 0);
+        assertNull(result);
+    }
+
+    @Test
+    void testUpdateCommentTree_whenHierarchyPathFieldAbsent_insertsAtTopLevel() throws Exception {
+        // payload has no hierarchyPath field at all (payload.get(...) returns null),
+        // covering the "!= null" false branch distinct from the "empty array" case.
+        ObjectNode payload = new ObjectMapper().createObjectNode();
+        payload.put(Constants.COMMENT_TREE_ID, "tree123");
+        payload.put(Constants.COMMENT_ID, "comment456");
+
+        ObjectNode existingCommentTreeData = createExistingCommentTreeData();
+
+        CommentTree commentTree = new CommentTree();
+        commentTree.setCommentTreeData(existingCommentTreeData);
+        commentTree.setCommentTreeId("tree123");
+
+        when(commentTreeRepository.findById("tree123")).thenReturn(Optional.of(commentTree));
+        when(commentTreeRepository.save(any())).thenReturn(commentTree);
+        when(objectMapper.convertValue(any(), eq(Map.class))).thenReturn(new HashMap<>());
+        when(objectMapper.createObjectNode()).thenReturn(new ObjectMapper().createObjectNode());
+        Mockito.when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+
+        CommentTree result = commentTreeService.updateCommentTree(payload);
+
+        assertNotNull(result);
+        assertEquals(1, existingCommentTreeData.get(Constants.COMMENTS).size());
+        assertEquals(1, existingCommentTreeData.get(Constants.FIRST_LEVEL_NODES).size());
+        verify(commentTreeRepository).save(any());
+    }
+
+    @Test
+    void testUpdateCommentTree_whenHierarchyPathConvertsToEmptyArray_targetIsObjectWithExistingChildren()
+            throws Exception {
+        // HIERARCHY_PATH is present/non-empty at the JSON level (passes the line 142
+        // guard), but objectMapper.treeToValue converts it to a zero-length array, so
+        // findTargetNode short-circuits (index >= length) and returns the COMMENTS node
+        // itself, unchecked for isArray(). Making COMMENTS a plain object that already
+        // has a CHILDREN array exercises the "target is an object with existing
+        // children" branch in insertAtHierarchyPath.
+        JsonNode payload = createPayload(true);
+
+        ObjectMapper realMapper = new ObjectMapper();
+        ObjectNode existingChild = realMapper.createObjectNode();
+        existingChild.put(Constants.COMMENT_ID, "existingChild1");
+        ArrayNode existingChildrenArr = realMapper.createArrayNode().add(existingChild);
+
+        ObjectNode commentsAsObject = realMapper.createObjectNode();
+        commentsAsObject.set(Constants.CHILDREN, existingChildrenArr);
+
+        ObjectNode treeData = realMapper.createObjectNode();
+        treeData.set(Constants.COMMENTS, commentsAsObject);
+        treeData.putArray(Constants.CHILD_NODES);
+        treeData.putArray(Constants.FIRST_LEVEL_NODES);
+
+        CommentTree commentTree = new CommentTree();
+        commentTree.setCommentTreeId("tree123");
+        commentTree.setCommentTreeData(treeData);
+
+        when(commentTreeRepository.findById("tree123")).thenReturn(Optional.of(commentTree));
+        when(commentTreeRepository.save(any())).thenReturn(commentTree);
+        when(objectMapper.convertValue(any(), eq(Map.class))).thenReturn(new HashMap<>());
+        when(objectMapper.createObjectNode()).thenReturn(new ObjectMapper().createObjectNode());
+        when(objectMapper.treeToValue(any(), eq(String[].class))).thenReturn(new String[0]);
+        Mockito.when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+
+        CommentTree result = commentTreeService.updateCommentTree(payload);
+
+        assertNotNull(result);
+        assertEquals(2, commentsAsObject.get(Constants.CHILDREN).size());
+        assertEquals(1, treeData.get(Constants.CHILD_NODES).size());
+        verify(commentTreeRepository).save(any());
+    }
+
+    @Test
     void testUpdateCommentTreeForDeletedComment_throwsExceptionIfCommentIdNotFound() {
         // Given
         String commentId = "missingId";

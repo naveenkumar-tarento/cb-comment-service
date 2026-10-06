@@ -58,4 +58,16 @@ class PropertiesCacheTest {
         String result = propertiesCache.readProperty("nonExistentKey");
         assertNull(result, "Should return null if property not found");
     }
+
+    @Test
+    void testGetProperty_EnvVariablePresent() {
+        String result = propertiesCache.getProperty("PATH");
+        assertEquals(System.getenv("PATH"), result, "Should return env value when present");
+    }
+
+    @Test
+    void testReadProperty_EnvVariablePresent() {
+        String result = propertiesCache.readProperty("PATH");
+        assertEquals(System.getenv("PATH"), result, "Should return env value when present");
+    }
 }

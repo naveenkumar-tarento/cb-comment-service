@@ -398,6 +398,44 @@ class ContentServiceImplTest {
     }
 
     @Test
+    void testReadContentFromCache_WhenRedisDataParsesToEmptyMap_ReturnsEmptyMap() throws Exception {
+        // Covers the "MapUtils.isNotEmpty(contentData) == false" branch in
+        // parseAndCacheContent (line 80): redis has content but it parses to an empty map.
+        List<String> fields = List.of("field1", "field2");
+        String redisContent = "{}";
+        when(dataCacheMgr.getContentFromCache(CONTENT_ID)).thenReturn(null);
+        when(redisCacheMgr.getContentFromCache(CONTENT_ID)).thenReturn(redisContent);
+        when(mapper.readValue(anyString(), any(TypeReference.class))).thenReturn(new HashMap<>());
+
+        Map<String, Object> result = contentService.readContentFromCache(CONTENT_ID, fields);
+
+        assertNotNull(result);
+        assertTrue(result.isEmpty());
+        verify(dataCacheMgr, never()).putContentInCache(anyString(), anyMap());
+    }
+
+    @Test
+    void testReadContentFromCache_WhenRedisDataMissingField_SkipsThatField() throws Exception {
+        // Covers the "contentData.containsKey(field) == false" branch in
+        // parseAndCacheContent (line 82): contentData is non-empty but is missing one
+        // of the requested fields.
+        List<String> fields = List.of("field1", "field2");
+        String redisContent = "{\"field1\":\"value1\"}";
+        Map<String, Object> contentData = new HashMap<>();
+        contentData.put("field1", "value1");
+        when(dataCacheMgr.getContentFromCache(CONTENT_ID)).thenReturn(null);
+        when(redisCacheMgr.getContentFromCache(CONTENT_ID)).thenReturn(redisContent);
+        when(mapper.readValue(anyString(), any(TypeReference.class))).thenReturn(contentData);
+
+        Map<String, Object> result = contentService.readContentFromCache(CONTENT_ID, fields);
+
+        assertNotNull(result);
+        assertEquals(1, result.size());
+        assertEquals("value1", result.get("field1"));
+        assertFalse(result.containsKey("field2"));
+    }
+
+    @Test
     void readContent_VerifiesEmptyFieldsList() {
         // Arrange
         String contentId = "test-content-id";

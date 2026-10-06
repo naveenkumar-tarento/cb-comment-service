@@ -325,6 +325,43 @@ class CommentServiceImplPaginatedCommentV3Test {
         assertEquals(HttpStatus.OK, response.getResponseCode());
     }
 
+    @Test
+    void testPaginatedCommentV3_UsesDefaultLimitAndOffset_WhenNotProvided() throws Exception {
+        // searchCriteria intentionally leaves limit/offset null so the ternary fallback to
+        // defaultLimit/defaultOffset is exercised (as opposed to every other test in this class,
+        // which sets them explicitly).
+        ReflectionTestUtils.setField(commentService, "defaultLimit", 10);
+        ReflectionTestUtils.setField(commentService, "defaultOffset", 0);
+
+        SearchCriteria searchCriteria = new SearchCriteria();
+        searchCriteria.setCommentTreeId("tree123");
+        searchCriteria.setOverrideCache(false);
+
+        Map<String, Object> commentResultMap = createMockCommentTreeData();
+        List<String> childNodeList = Arrays.asList("comment1", "comment2");
+        Map<String, Object> resultMap = new HashMap<>();
+        resultMap.put("comments", new ArrayList<>());
+
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(valueOperations.get(Constants.COMMENT_TREE_REDIS_KEY + "tree123"))
+                .thenReturn("{\"firstLevelNodes\":[\"comment1\",\"comment2\"]}");
+        when(objectMapper.readValue(anyString(), any(TypeReference.class)))
+                .thenReturn(commentResultMap);
+        when(objectMapper.valueToTree(any())).thenReturn(createMockJsonNode());
+        when(objectMapper.convertValue(any(JsonNode.class), eq(List.class)))
+                .thenReturn(childNodeList);
+        when(valueOperations.get(startsWith(Constants.COMMENT_KEY)))
+                .thenReturn("{\"result\":\"cached\"}");
+        when(objectMapper.readValue(eq("{\"result\":\"cached\"}"), any(TypeReference.class)))
+                .thenReturn(resultMap);
+
+        ApiResponse response = commentService.paginatedCommentV3(searchCriteria);
+
+        assertNotNull(response);
+        assertEquals(HttpStatus.OK, response.getResponseCode());
+        assertEquals(resultMap, response.getResult());
+    }
+
     private Map<String, Object> createMockCommentTreeData() {
         Map<String, Object> data = new HashMap<>();
         data.put(Constants.FIRST_LEVEL_NODES, Arrays.asList("comment1", "comment2"));

@@ -333,4 +333,113 @@ class AccessTokenValidatorTest {
         }
     }
 
+    @Test
+    void testValidateToken_signatureVerificationFails_returnsUnauthorized() throws Exception {
+        // Covers the "isValid == false" branch of validateToken (line 62):
+        // signature check returns false instead of throwing.
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("iss", "http://validissuer");
+        payload.put(Constants.SUB, "user:valid");
+        payload.put("exp", Time.currentTime() + 9999);
+        String token = mockToken(payload);
+
+        PublicKey localPublicKey = mock(PublicKey.class);
+        KeyData keyData = new KeyData("testKeyId", localPublicKey);
+        when(keyManager.getPublicKey(anyString())).thenReturn(keyData);
+
+        try (MockedStatic<CryptoUtil> cryptoUtilMock = mockStatic(CryptoUtil.class)) {
+            cryptoUtilMock.when(() ->
+                    CryptoUtil.verifyRSASign(anyString(), any(), eq(localPublicKey), eq(Constants.SHA_256_WITH_RSA))
+            ).thenReturn(false);
+
+            String result = accessTokenValidator.verifyUserToken(token);
+
+            assertEquals(Constants.UNAUTHORIZED_USER, result);
+        }
+    }
+
+    @Test
+    void testValidateToken_unexpectedExceptionFromMissingKid_returnsUnauthorized() {
+        // Covers the generic "catch (Exception ex)" branch of validateToken (line 76)
+        // via a NullPointerException (headerData.get("kid") is null) rather than a
+        // mocked/thrown exception, which is a different code path than the existing
+        // IOException/IllegalArgumentException and mocked-RuntimeException tests.
+        String headerJson = "{}"; // valid JSON, but no "kid" entry
+        String bodyJson = "{}";
+        String header = Base64.getUrlEncoder().withoutPadding()
+                .encodeToString(headerJson.getBytes(StandardCharsets.UTF_8));
+        String body = Base64.getUrlEncoder().withoutPadding()
+                .encodeToString(bodyJson.getBytes(StandardCharsets.UTF_8));
+        String signature = Base64.getUrlEncoder().withoutPadding()
+                .encodeToString("sig".getBytes(StandardCharsets.UTF_8));
+
+        String token = String.join(".", header, body, signature);
+
+        String result = accessTokenValidator.verifyUserToken(token);
+
+        assertEquals(Constants.UNAUTHORIZED_USER, result);
+    }
+
+    @Test
+    void testVerifyUserToken_blankSubject_returnsNull() throws Exception {
+        // Covers the "StringUtils.isNotBlank(userId) == false" branch (line 99):
+        // valid signature + valid issuer, but no "sub" claim in the payload.
+        Field realmUrlField = AccessTokenValidator.class.getDeclaredField("realmUrl");
+        realmUrlField.setAccessible(true);
+        String validIssuer = (String) realmUrlField.get(accessTokenValidator);
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("iss", validIssuer);
+        payload.put("exp", Time.currentTime() + 5000);
+        // Intentionally no Constants.SUB entry.
+
+        String token = mockToken(payload);
+
+        PublicKey localPublicKey = mock(PublicKey.class);
+        KeyData keyData = new KeyData("testKeyId", localPublicKey);
+        when(keyManager.getPublicKey(anyString())).thenReturn(keyData);
+
+        try (MockedStatic<CryptoUtil> cryptoUtilMock = mockStatic(CryptoUtil.class)) {
+            cryptoUtilMock.when(() ->
+                    CryptoUtil.verifyRSASign(anyString(), any(), eq(localPublicKey), eq(Constants.SHA_256_WITH_RSA))
+            ).thenReturn(true);
+
+            String result = accessTokenValidator.verifyUserToken(token);
+
+            assertNull(result);
+        }
+    }
+
+    @Test
+    void testCheckIss_blankRealmUrl_returnsFalse() throws Exception {
+        // Covers the "StringUtils.isBlank(realmUrl) == true" branch of checkIss (line 117).
+        // The realmUrl is built in the constructor as "<ssoUrl>realms/<realm>", so it can
+        // never be blank through the public constructor; it is set via reflection here
+        // purely to exercise this otherwise-unreachable branch.
+        Field realmUrlField = AccessTokenValidator.class.getDeclaredField("realmUrl");
+        realmUrlField.setAccessible(true);
+        realmUrlField.set(accessTokenValidator, "");
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("iss", "http://any-issuer");
+        payload.put(Constants.SUB, "user:abc");
+        payload.put("exp", Time.currentTime() + 5000);
+
+        String token = mockToken(payload);
+
+        PublicKey localPublicKey = mock(PublicKey.class);
+        KeyData keyData = new KeyData("testKeyId", localPublicKey);
+        when(keyManager.getPublicKey(anyString())).thenReturn(keyData);
+
+        try (MockedStatic<CryptoUtil> cryptoUtilMock = mockStatic(CryptoUtil.class)) {
+            cryptoUtilMock.when(() ->
+                    CryptoUtil.verifyRSASign(anyString(), any(), eq(localPublicKey), eq(Constants.SHA_256_WITH_RSA))
+            ).thenReturn(true);
+
+            String result = accessTokenValidator.verifyUserToken(token);
+
+            assertEquals(Constants.UNAUTHORIZED_USER, result);
+        }
+    }
+
 }

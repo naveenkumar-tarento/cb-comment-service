@@ -125,4 +125,55 @@ class Base64Util3Test {
         assertEquals("TWE", new String(result));
     }
 
+    /**
+     * Sets state to a value outside the 0-6 range handled explicitly by the state machine, to
+     * exercise the default arm of both the per-byte switch inside the main loop and the
+     * finalization switch reached when finish == true. This state is unreachable through the
+     * public API, but is poked the same way the file's other reflection-based tests (e.g.
+     * testInvalidStateEarlyExit) already set the internal state field directly.
+     */
+    @Test
+    void testInvalidStateValue_HitsDefaultBranches() throws Exception {
+        setField("state", 7);
+        byte[] input = "AB".getBytes();
+        boolean result = decoder.process(input, 0, input.length, true);
+        assertTrue(result);
+        assertEquals(0, decoder.op); // default arm performs no decoding work
+    }
+
+    /**
+     * Embedded whitespace must be skipped transparently regardless of which decoder state it
+     * lands in, rather than erroring: state 1 (right after the first data char), state 3 (waiting
+     * on the 4th byte of a tuple), state 4 (between the two padding '=' characters) and state 5
+     * (trailing, after both paddings have been consumed) each have their own "skip" branch in the
+     * source. Each case is verified against the same string with the whitespace removed, decoded
+     * through the public API.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {
+        "T Wu",   // whitespace in state 1
+        "TWF u",  // whitespace in state 3
+        "TQ= =",  // whitespace in state 4
+        "TQ== "   // whitespace in state 5
+    })
+    void testEmbeddedWhitespace_IsSkippedTransparently(String withWhitespace) {
+        String withoutWhitespace = withWhitespace.replace(" ", "");
+        assertArrayEquals(
+            Base64Util.decode(withoutWhitespace, Base64Util.DEFAULT),
+            Base64Util.decode(withWhitespace, Base64Util.DEFAULT)
+        );
+    }
+
+    /**
+     * Decoding exactly two valid data characters with no padding leaves the state machine in
+     * state 2 at finish time, which emits one output byte. No existing test finishes decoding
+     * while still in state 2.
+     */
+    @Test
+    void testFinishInState2_NoPadding_EmitsOneByte() {
+        byte[] input = "TW".getBytes();
+        assertTrue(decoder.process(input, 0, input.length, true));
+        assertEquals(1, decoder.op);
+    }
+
 }
