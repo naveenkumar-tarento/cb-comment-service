@@ -11,6 +11,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.databind.node.TextNode;
 import com.networknt.schema.JsonSchema;
 import com.networknt.schema.JsonSchemaFactory;
 import com.networknt.schema.SpecVersion;
@@ -133,7 +134,7 @@ public class CommentServiceImpl implements CommentService {
     validatePayload(Constants.ADD_FIRST_COMMENT_PAYLOAD_VALIDATION_FILE, payload);
     Comment comment = getPersistedComment(payload);
 
-    ((ObjectNode) payload).put(Constants.COMMENT_ID, comment.getCommentId());
+    ((ObjectNode) payload).set(Constants.COMMENT_ID, TextNode.valueOf(comment.getCommentId()));
     CommentTree commentTree = commentTreeService.createCommentTree(payload);
 
     return new ResponseDTO(commentTree, comment);
@@ -144,7 +145,7 @@ public class CommentServiceImpl implements CommentService {
     log.info("CommentService::addNewCommentToTree:Payload received: {}", payload);
     validatePayload(Constants.ADD_NEW_COMMENT_PAYLOAD_VALIDATION_FILE, payload);
     Comment comment = getPersistedComment(payload);
-    ((ObjectNode) payload).put(Constants.COMMENT_ID, comment.getCommentId());
+    ((ObjectNode) payload).set(Constants.COMMENT_ID, TextNode.valueOf(comment.getCommentId()));
     CommentTree commentTree = commentTreeService.updateCommentTree(payload);
     return new ResponseDTO(commentTree, comment);
   }
