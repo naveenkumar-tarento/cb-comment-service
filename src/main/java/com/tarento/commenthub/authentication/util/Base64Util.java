@@ -588,8 +588,12 @@ public class Base64Util {
         // total.
         p = finishEncoding(input, p, len);
 
-        assert tailLen == 0;
-        assert p == len;
+        if (tailLen != 0) {
+          throw new IllegalStateException("tailLen must be 0 after finishEncoding");
+        }
+        if (p != len) {
+          throw new IllegalStateException("p must equal len after finishEncoding");
+        }
       } else {
         // Save the leftovers in tail to be consumed on the next
         // call to encodeInternal.

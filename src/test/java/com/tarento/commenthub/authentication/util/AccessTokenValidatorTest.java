@@ -360,7 +360,7 @@ class AccessTokenValidatorTest {
 
     @Test
     void testValidateToken_unexpectedExceptionFromMissingKid_returnsUnauthorized() {
-        // Covers the generic "catch (Exception ex)" branch of validateToken (line 76)
+        // Covers the generic exception-handling branch of validateToken (line 76)
         // via a NullPointerException (headerData.get("kid") is null) rather than a
         // mocked/thrown exception, which is a different code path than the existing
         // IOException/IllegalArgumentException and mocked-RuntimeException tests.
